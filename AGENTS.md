@@ -22,6 +22,10 @@ Partners: **ENS + Arkiv + World**. Build order: **CORE first** (FINAL_PLAN secti
 - Write the least code that works. No unused abstractions, no speculative features, no copy-paste walls. If a module passes ~300 lines, split it or simplify it.
 - Prefer one obvious way: Python (FastAPI + Pydantic + web3.py) everywhere except the contract (Solidity) and tiny frontend JS.
 
+**Tests ship WITH every feature (same commit), never later:** for each feature list its edge cases (denied, expired, replayed, unauthorized, over-limit, stale price, network/service down, bad input) and test each one: Python in `engine/tests` (`cd engine && uv run pytest -q`), contracts in `contracts/test` (`cd contracts && forge test`). Both suites must pass before every commit.
+
+**Instructions to the owner:** every command says which folder to run it in, and every website step says exactly where to click.
+
 **Docs to keep updated after every phase:**
 - `ARCHITECTURE.md`: **only flowcharts and diagrams, in very simple language** (no jargon without a one-line explanation). Update it whenever a flow changes.
 - `AGENTS.md` (this file): update section 0's "Iteration log" below after every phase: what works now, what changed, what's next.
@@ -31,7 +35,7 @@ Partners: **ENS + Arkiv + World**. Build order: **CORE first** (FINAL_PLAN secti
 - 2026-11-06 12:00: Plan locked (FINAL_PLAN.md). Skeleton + interfaces committed.
 - 2026-11-06 12:30: Phase 1 started: 4 builders working in parallel on vault contract, Arkiv store, ENSv2 badge, World Agent Pass.
 - 2026-11-06 13:15: Phase 1 done (52 Python tests pass; contract compiles with solc 0.8.24, Foundry tests not yet run, so Foundry install is needed). Nothing written on-chain yet: needs funded keys. Next: Phase 2 = Arkiv via official JS SDK bridge (fail-closed writer filter), engine core (vault client, bot loop, launch flow, API), dashboard, ENS module trim + deploy order (oracle → vault → setVault).
-- 2026-11-06 13:45: Phase 2 done. Arkiv bridge (official JS SDK) + fail-closed client; vault.py + bot_runner.py (Claude Haiku + rule fallback); launcher + API + dashboard + offline simulation; ENS trimmed to 300 lines; deploy order fixed. Lead fixed 4 cross-module mismatches + 2 security holes (World approval hijack → server-created launch ids + claim token; creator wallet key derived from public data → HMAC with server secret PARABLE_CREATOR_SECRET). 69 tests pass; offline end-to-end smoke test passes. Security pass 2: kill is creator-only (owner token), raw errors never shown, arkiv-bridge needs ARKIV_BRIDGE_TOKEN + local Host + no browser Origin. Next: Phase 3 = real-chain run (needs keys: Foundry, Sepolia ETH, Arkiv funds, World portal app, ENS parent name, Anthropic key).
+- 2026-11-06 13:45: Phase 2 done. Arkiv bridge (official JS SDK) + fail-closed client; vault.py + bot_runner.py (Claude Haiku + rule fallback); launcher + API + dashboard + offline simulation; ENS trimmed to 300 lines; deploy order fixed. Lead fixed 4 cross-module mismatches + 2 security holes (World approval hijack → server-created launch ids + claim token; creator wallet key derived from public data → HMAC with server secret PARABLE_CREATOR_SECRET). 69 tests pass; offline end-to-end smoke test passes. Security pass 2: kill is creator-only (owner token), raw errors never shown, arkiv-bridge needs ARKIV_BRIDGE_TOKEN + local Host + no browser Origin. Foundry installed: all 39 contract tests pass (2 test bugs fixed). Next: Phase 3 = real-chain run (needs keys: Foundry, Sepolia ETH, Arkiv funds, World portal app, ENS parent name, Anthropic key).
 
 ## 1. Mission
 

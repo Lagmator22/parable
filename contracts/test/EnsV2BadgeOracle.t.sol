@@ -165,9 +165,10 @@ contract EnsV2BadgeOracleTest is Test {
     }
 
     function test_bindRejectsLabelThatIsNotTheFirstLabel() public {
+        bytes32 freshNode = keccak256("some-unbound-node"); // not bound in setUp, so the name check is reached
         vm.prank(operator);
         vm.expectRevert(EnsV2BadgeOracle.BadName.selector);
-        oracle.bind(node, IEnsV2Registry(address(registry)), "bot-02", dnsName, bot);
+        oracle.bind(freshNode, IEnsV2Registry(address(registry)), "bot-02", dnsName, bot);
     }
 
     function test_cannotBindTwice() public {

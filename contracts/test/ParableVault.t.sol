@@ -92,7 +92,11 @@ contract ParableVaultTest is Test {
         vm.startPrank(bot);
         feed.setPrice(int256(3333_33333333)); // awkward price
         vault.trade(id, true, 7e6);
+        // Buying rounds the ETH down, so the bot owns slightly less than $7 of ETH:
+        // selling a full $7 must be refused, selling a hair less must work, and no value is ever created.
+        vm.expectRevert(ParableVault.InsufficientBalance.selector);
         vault.trade(id, false, 7e6);
+        vault.trade(id, false, 7e6 - 1);
         vm.stopPrank();
         assertLe(vault.equityUsd(id), CASH);
     }

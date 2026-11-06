@@ -104,7 +104,7 @@ def expire(bot_id: int) -> str:
     return _tx_hex(_send(_vault().functions.expire(bot_id), _operator_key()))
 
 
-BOT_GAS_WEI = 3 * 10**15  # 0.003 test ETH: enough gas for a bot's trades on Sepolia
+BOT_GAS_WEI = 10**15  # 0.001 test ETH: enough gas for a bot's trades on Sepolia (gas there is very cheap)
 
 
 def fund_gas(bot_address: str, wei: int = BOT_GAS_WEI) -> str:
