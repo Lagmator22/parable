@@ -66,7 +66,7 @@ You can also launch a group of bots supervised by a model in **Swarm**, or use t
 
 ## Verified demo results
 
-On 7 November 2026 (03:30 IST), the live API reported **25 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **59 trades**, **16 expiries** and **9 creator stops**. The vault refused every cheat attempt from the dashboard: an unregistered trade, an over-limit trade and a second wallet for the same person. [Live report](https://parable-demo.centralindia.cloudapp.azure.com/api/report) and [Graveyard API](https://parable-demo.centralindia.cloudapp.azure.com/api/graveyard/all)
+On 7 November 2026 (04:30 IST), the live API reported **26 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **68 trades**, **17 expiries** and **9 creator stops**. The vault refused every cheat attempt from the dashboard: an unregistered trade, an over-limit trade and a second wallet for the same person. [Live report](https://parable-demo.centralindia.cloudapp.azure.com/api/report) and [Graveyard API](https://parable-demo.centralindia.cloudapp.azure.com/api/graveyard/all)
 
 Most bots ran for only a few minutes. The vault marks positions at the Chainlink feed price, which can stay flat during a short run. Returns are displayed to one decimal place, so a return such as −0.01% appears as 0.0%. The stop reason records how the bot ended, independently of its return.
 
