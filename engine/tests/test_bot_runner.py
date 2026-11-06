@@ -20,6 +20,13 @@ RULES = BotRules(strategy="momentum", start_cash_usd=50_000_000, max_trade_usd=1
                  max_loss_bps=500, lease_seconds=600)
 
 
+@pytest.fixture
+def claude_enabled(monkeypatch):
+    settings = B.get_settings()
+    monkeypatch.setattr(settings, "claude_models", "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5")
+    monkeypatch.setattr(settings, "anthropic_api_key", "fake-claude-key")
+
+
 def test_clamp_to_max_trade_and_balance():
     big = TradeDecision(action="buy", amount_usd=99_000_000, reason="x")
     assert B.clamp(big, STATE).amount_usd == 10_000_000
@@ -32,7 +39,7 @@ def test_clamp_sell_with_no_eth_becomes_hold():
     assert B.clamp(sell, STATE).action == "hold"
 
 
-def test_llm_failure_falls_back_to_rule(monkeypatch):
+def test_llm_failure_falls_back_to_rule(monkeypatch, claude_enabled):
     def boom(state, model=None):
         raise TimeoutError("slow")
     monkeypatch.setattr(B, "claude_decide", boom)
@@ -41,7 +48,7 @@ def test_llm_failure_falls_back_to_rule(monkeypatch):
     assert d.action == "buy" and d.amount_usd == 10_000_000
 
 
-def test_invalid_llm_output_falls_back(monkeypatch):
+def test_invalid_llm_output_falls_back(monkeypatch, claude_enabled):
     class FakeClient:
         def __init__(self, **kw):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
@@ -50,7 +57,7 @@ def test_invalid_llm_output_falls_back(monkeypatch):
     assert B.decide(STATE, "claude:claude-haiku-5-5").action == "buy"  # validation error -> rule
 
 
-def test_valid_llm_output_used(monkeypatch):
+def test_valid_llm_output_used(monkeypatch, claude_enabled):
     class FakeClient:
         def __init__(self, **kw):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
@@ -75,7 +82,7 @@ def test_loop_stops_on_dead_bot(monkeypatch):
     assert events == ["stopped"]
 
 
-def test_loop_reports_traded_and_rejected(monkeypatch):
+def test_loop_reports_traded_and_rejected(monkeypatch, claude_enabled):
     alive = {"status": "alive", "expiresAt": 2**40, "cashUsd": 50_000_000, "ethWei": 0,
              "maxTradeUsd": 10_000_000, "maxLossBps": 500}
     monkeypatch.setattr(B.vault, "get_bot", lambda i: alive)
@@ -140,7 +147,7 @@ def test_claude_is_not_forced_to_use_the_tool(monkeypatch):
     assert seen["tool_choice"] == {"type": "auto"} and seen["tools"][0]["strict"] is True
 
 
-def test_claude_reply_without_tool_call_falls_back(monkeypatch):
+def test_claude_reply_without_tool_call_falls_back(monkeypatch, claude_enabled):
     class FakeClient:
         def __init__(self, **kw):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
@@ -166,7 +173,7 @@ HOLD = '{"action":"hold","amount_dollars":0,"reason":"calm"}'
 
 
 @pytest.fixture
-def configured(monkeypatch):
+def configured(monkeypatch, claude_enabled):
     """Every brain is set up, with fake keys and models; returns the list of HTTP calls the brains make."""
     s = B.get_settings()
     for name, value in dict(anthropic_api_key="k-claude", gemini_api_key="k-google", gemini_models="gem-a, gem-b",
@@ -276,10 +283,9 @@ def test_available_brains_reports_only_true_false(configured):
 
 def test_rule_is_always_available_even_with_nothing_set(monkeypatch):
     s = B.get_settings()
-    for name in ("anthropic_api_key", "gemini_api_key", "gemini_models", "gemma_models", "local_llm_model", "autoloops_api_key", "jev_models"):
+    for name in ("anthropic_api_key", "claude_models", "gemini_api_key", "gemini_models", "gemma_models", "local_llm_model", "autoloops_api_key", "jev_models"):
         monkeypatch.setattr(s, name, "")
-    assert B.available_brains() == {"rule": True, "claude:claude-haiku-5-5": False, "claude:claude-sonnet-5-5": False,
-                                    "claude:claude-opus-5-5": False}
+    assert B.available_brains() == {"rule": True}
 
 
 def test_each_claude_model_is_its_own_brain(configured, monkeypatch):

@@ -80,6 +80,7 @@ def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
     s = api.get_settings()
     monkeypatch.setattr(s, "gemini_api_key", "SECRET-GOOGLE-KEY")
     monkeypatch.setattr(s, "anthropic_api_key", "SECRET-CLAUDE-KEY")
+    monkeypatch.setattr(s, "claude_models", "")
     monkeypatch.setattr(s, "gemini_models", "gem-model,gem-two")
     monkeypatch.setattr(s, "gemma_models", "")
     monkeypatch.setattr(s, "local_llm_model", "")
@@ -88,8 +89,11 @@ def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
     r = c.get("/api/brains")
     assert "SECRET" not in r.text
     found = {b["brain"]: b["available"] for b in r.json()}
-    assert found == {"rule": True, "claude:claude-haiku-5-5": True, "claude:claude-sonnet-5-5": True,
-                     "claude:claude-opus-5-5": True, "gemini:gem-model": True, "gemini:gem-two": True}
+    assert found == {"rule": True, "gemini:gem-model": True, "gemini:gem-two": True}
+    claude = "claude:claude-haiku-5-5"
+    assert c.post("/api/launch", json={"brain": claude}).status_code == 422
+    assert c.post("/api/swarm/start", json={"mind": claude, "workers": ["rule"]}).status_code == 400
+    assert c.post("/api/swarm/start", json={"mind": "gemini:gem-model", "workers": [claude]}).status_code == 400
 
 
 def test_launch_with_unconfigured_brain_is_rejected(client, monkeypatch):

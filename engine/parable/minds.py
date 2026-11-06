@@ -28,11 +28,12 @@ def claude_usable() -> bool:
 def probe_claude() -> None:
     """One tiny call at startup to learn whether the account has credit (a failed call costs nothing)."""
     s = get_settings()
-    if not s.anthropic_api_key:
+    models = [model.strip() for model in s.claude_models.split(",") if model.strip()]
+    if not s.anthropic_api_key or not models:
         return
     try:
         anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=20).messages.create(
-            model="claude-haiku-5-5", max_tokens=1, messages=[{"role": "user", "content": "ok"}])
+            model=models[0], max_tokens=1, messages=[{"role": "user", "content": "ok"}])
     except Exception as err:
         note_claude_error(err)
 

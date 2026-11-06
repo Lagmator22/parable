@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     world_allow_demo: bool = False  # demo approval (no World App, bots marked "demo"); see world_pass.demo_allowed
     anthropic_api_key: str = ""
     bot_model: str = "claude-haiku-5-5"
-    # Every Claude model listed here becomes its own brain ("claude:<model>"), like the Gemini list.
-    claude_models: str = "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5"
+    # Hosted Claude models are opt-in. MCP clients choose their own model separately.
+    claude_models: str = ""
     # Jev (Autoloops): the model scores buy/sell/hold and returns probabilities. Key from autoloops.ai/console.
     autoloops_api_key: str = ""
     jev_models: str = "gemma-4-31b-it,deepseek-v4.1-flash"
