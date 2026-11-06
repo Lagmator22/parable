@@ -52,6 +52,20 @@ Novelty is the **combination** (prior art credited in FINAL_PLAN.md §10 / docs/
   Gemma had Google-side 500s. `claude` needs credit. `local` (Ollama) = very last stretch.
 - Tests: **135 Python + 39 Foundry pass** (last commit `ea8b64c`).
 
+## 4b. UPDATE 15:55 IST: first real launches WORK
+- Arkiv access key added; bridge restarted; queries take 0.4 s. Real launches succeeded: vault totalBorn = 4
+  (bot 1 orphan, bot 2 died after its 10-min lease, bots 3 and 4 alive, brain `rule`). `/api/report/brains` works.
+- Open issues found:
+  1. Confirm waits for the Arkiv writes (outbox runs them synchronously); with a slow Arkiv the page sits on
+     "waiting" for minutes even though the bot is born. Improve: run launch-time Arkiv writes in a background thread.
+  2. **Sepolia Chainlink price changes ~once an hour**, so `momentum` / `dip_buyer` rule bots see a flat price and just
+     HOLD (no trades). For demos use strategy `yolo` (always trades) or a Gemini brain; consider adding a recent-price
+     feed for the bot's *decision* only (the vault still trades at Chainlink).
+  3. Old dashboard keeps "waiting for World ID approval" text until confirm returns; frontend (Codex) should show the
+     409 detail ("being born on-chain").
+  4. Queued Arkiv writes for bot 2 (grave/death) should flush automatically now; verify bot 2 is in the graveyard and
+     `repair: bot 1: record rebuilt` appears in /tmp/parable_app.log.
+
 ## 5. Current state of the FIRST REAL LAUNCH (most important open item)
 First real launch failed (World approved, then): nonce clash ("replacement transaction underpriced") + Arkiv overload
 + the page re-polling confirm while the bot was still being born. **All fixed and pushed** (commits `ce5c144`, `ea8b64c`):
