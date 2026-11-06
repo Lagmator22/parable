@@ -67,28 +67,26 @@ export default function App() {
     <main inert={menuOpen}>
       <section className="hero">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="status-dot"/>THE PUBLIC RECORD FOR AI TRADING BOTS</div>
           <h1>Every bot.<br/>Every trade.<br/><span>Every failure.</span></h1>
-          <p>Creators can show you their winners. Parable shows you the whole record—including the bots that died.</p>
+          <p>Creators can show you their winners. Parable shows you the whole record, including the bots that died.</p>
           <div className="hero-actions"><ScrambleLink label="See how it works" href="#how" arrow className="main-action"/><ScrambleLink label="Why trust it?" href="#trust"/></div>
         </div>
         <div className="hero-visual" aria-label="Illustration of a bot's public history">
-          <div className="visual-top"><span>BOT HISTORY</span><span>PUBLIC · VERIFIABLE</span></div>
+          <h2 className="visual-title">A bot's public history</h2>
           <div className="visual-line"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div></div>
           <div className="visual-line"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div></div>
           <div className="visual-line"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></div>
-          <div className="visual-bottom">AN ILLUSTRATION OF THE RECORD</div>
         </div>
       </section>
       <section className="content-section" id="how">
-        <div className="section-heading"><span>HOW IT WORKS</span><h2>Bots don’t keep<br/>their own score.</h2><p>A bot can request a trade. The vault decides whether it is allowed, holds the practice money, and records what happened.</p></div>
+        <div className="section-heading"><h2>Bots don’t keep<br/>their own score.</h2><p>A bot can request a trade. The vault decides whether it is allowed, holds the practice money, and records what happened.</p></div>
         <div className="feature-grid">
           <article><span>01</span><h3>One real creator</h3><p>World approval connects each bot to a verified human before launch.</p></article>
           <article><span>02</span><h3>Clear permissions</h3><p>An ENS name gives the bot an identity the vault can check and revoke.</p></article>
-          <article><span>03</span><h3>No hidden losses</h3><p>Arkiv keeps births, trades and deaths searchable—even after a bot stops.</p></article>
+          <article><span>03</span><h3>No hidden losses</h3><p>Arkiv keeps births, trades and deaths searchable, even after a bot stops.</p></article>
         </div>
       </section>
-      <section className="trust-section" id="trust"><span>WHY TRUST IT</span><h2>Don’t take a bot’s<br/><em>word for it.</em></h2><p>Parable’s vault is the source of truth. It counts every bot and every trade. The public record carries transaction links, so anyone can check the history independently.</p><div className="trust-note"><strong>Built on Sepolia with practice funds.</strong><span>The record shows honesty about results, not proof that a strategy will make money.</span></div></section>
+      <section className="trust-section" id="trust"><h2>Don’t take a bot’s<br/><em>word for it.</em></h2><p>Parable’s vault is the source of truth. It counts every bot and every trade. The public record carries transaction links, so anyone can check the history independently.</p><div className="trust-note"><strong>Built on Sepolia with practice funds.</strong><span>The record shows honesty about results, not proof that a strategy will make money.</span></div></section>
     </main>
     <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top"/></footer>
   </div>;

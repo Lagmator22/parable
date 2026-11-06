@@ -19,17 +19,21 @@ function useScramble(label: string) {
       if (step >= label.length * 2) { window.clearInterval(timer.current); setText(label); }
     }, 24);
   }
-  return { text, start };
+  function stop() {
+    window.clearInterval(timer.current);
+    setText(label);
+  }
+  return { text, start, stop };
 }
 
 type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { label: string; arrow?: boolean };
 export function ScrambleLink({ label, arrow, className = '', ...props }: LinkProps) {
-  const { text, start } = useScramble(label);
-  return <a {...props} className={`scramble ${className}`} onMouseEnter={start} onFocus={start} onTouchStart={start} aria-label={label}><span className="scramble-text" aria-hidden="true">{text}</span>{arrow && <span className="scramble-arrow" aria-hidden="true">↗</span>}</a>;
+  const { text, start, stop } = useScramble(label);
+  return <a {...props} className={`scramble ${className}`} onMouseEnter={start} onMouseLeave={stop} onFocus={start} onBlur={stop} onTouchStart={start} aria-label={label}><span className="scramble-text" aria-hidden="true"><span className="scramble-width">{label}</span><span className="scramble-animated">{text}</span></span>{arrow && <span className="scramble-arrow" aria-hidden="true">↗</span>}</a>;
 }
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { label: string; arrow?: boolean };
 export function ScrambleButton({ label, arrow, className = '', ...props }: ButtonProps) {
-  const { text, start } = useScramble(label);
-  return <button {...props} className={`scramble ${className}`} onMouseEnter={start} onFocus={start} onTouchStart={start} aria-label={label}><span className="scramble-text" aria-hidden="true">{text}</span>{arrow && <span className="scramble-arrow" aria-hidden="true">↗</span>}</button>;
+  const { text, start, stop } = useScramble(label);
+  return <button {...props} className={`scramble ${className}`} onMouseEnter={start} onMouseLeave={stop} onFocus={start} onBlur={stop} onTouchStart={start} aria-label={label}><span className="scramble-text" aria-hidden="true"><span className="scramble-width">{label}</span><span className="scramble-animated">{text}</span></span>{arrow && <span className="scramble-arrow" aria-hidden="true">↗</span>}</button>;
 }
