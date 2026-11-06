@@ -30,6 +30,7 @@ Partners: **ENS + Arkiv + World**. Build order: **CORE first** (FINAL_PLAN secti
 **Iteration log**
 - 2026-11-06 12:00: Plan locked (FINAL_PLAN.md). Skeleton + interfaces committed.
 - 2026-11-06 12:30: Phase 1 started: 4 builders working in parallel on vault contract, Arkiv store, ENSv2 badge, World Agent Pass.
+- 2026-11-06 13:15: Phase 1 done (52 Python tests pass; contract compiles with solc 0.8.24, Foundry tests not yet run, so Foundry install is needed). Nothing written on-chain yet: needs funded keys. Next: Phase 2 = Arkiv via official JS SDK bridge (fail-closed writer filter), engine core (vault client, bot loop, launch flow, API), dashboard, ENS module trim + deploy order (oracle → vault → setVault).
 
 ## 1. Mission
 
