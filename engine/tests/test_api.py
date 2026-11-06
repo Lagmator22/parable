@@ -315,3 +315,20 @@ def test_graph_series_survives_no_market_price(client):
     rec.sample()  # must not raise; the market value falls back to the vault value
     point = rec.to_dict()["bots"][0]["points"][0]
     assert point[1] == point[2]
+
+
+def test_second_approved_swarm_cannot_replace_a_running_one(client, monkeypatch):
+    from parable import manager as M
+
+    c, world, lau = client
+    mgr = M.SwarmManager(lau)
+    monkeypatch.setattr(M, "available_brains", lambda: {"rule": True, "gemini:m": True})
+    first, claim1 = mgr.start("gemini:m", ["rule"], 1, 5)
+    second, claim2 = mgr.start("gemini:m", ["rule"], 1, 5)  # two approvals in flight at once
+    world.decide(first, True)
+    world.decide(second, True)
+    mgr.confirm(first, claim1)
+    with pytest.raises(M.LaunchError):
+        mgr.confirm(second, claim2)  # void: a swarm already started
+    assert mgr.claim == claim1
+    mgr.stop_event.set()

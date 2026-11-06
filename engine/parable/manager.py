@@ -54,7 +54,8 @@ class SwarmManager:
     def __init__(self, launcher, check_every_s: float = CHECK_EVERY_S):
         self.launcher = launcher
         self.check_every_s = check_every_s
-        self.lock = threading.Lock()
+        self.lock = threading.Lock()  # guards starting and confirming
+        self.notes_lock = threading.Lock()
         self.pending: dict[str, tuple[SwarmPlan, str]] = {}  # swarm launch id -> (plan, claim token)
         self.plan: SwarmPlan | None = None
         self.claim = ""
@@ -83,23 +84,29 @@ class SwarmManager:
         return pid, claim
 
     def confirm(self, pid: str, claim: str) -> dict:
-        """Poll after World approval. The first approved call starts launching the workers in the background."""
-        entry = self.pending.get(pid)
-        if entry is None or not secrets.compare_digest(entry[1], claim):
-            if self.claim and secrets.compare_digest(self.claim, claim):
-                return self.status()  # asked again after it started: same answer
-            raise LaunchError("unknown swarm launch or wrong claim token")
-        approval = self.launcher.b.world.get_approval(pid)
-        if approval is None:
-            raise ApprovalPending("waiting for World ID approval")
-        self.pending.pop(pid, None)
-        if not approval.approved:
-            self.phase = "idle"
-            raise LaunchError(f"not approved: {approval.reason}")
-        self.plan, self.claim, self.bot_ids, self.decisions = entry[0], claim, [], []
-        self.phase = "launching"
-        self.stop_event = threading.Event()
-        threading.Thread(target=self._run, args=(to_bytes32(approval.subject),), daemon=True).start()
+        """Poll after World approval. The first approved call starts launching the workers in the background.
+        Done under the lock: an approval is used once, and a running swarm can't be replaced by another."""
+        with self.lock:
+            entry = self.pending.get(pid)
+            if entry is None or not secrets.compare_digest(entry[1], claim):
+                if self.claim and secrets.compare_digest(self.claim, claim):
+                    return self.status()  # asked again after it started: same answer
+                raise LaunchError("unknown swarm launch or wrong claim token")
+            approval = self.launcher.b.world.get_approval(pid)
+            if approval is None:
+                raise ApprovalPending("waiting for World ID approval")
+            self.pending.pop(pid, None)
+            if not approval.approved:
+                self.phase = "idle"
+                raise LaunchError(f"not approved: {approval.reason}")
+            if self.phase in ("launching", "running"):
+                raise LaunchError("a swarm is already running; stop it first")
+            self.pending.clear()  # any other approval in flight is void once a swarm starts
+            self.plan, self.claim, self.bot_ids, self.decisions = entry[0], claim, [], []
+            self.phase = "launching"
+            self.stop_event = threading.Event()
+            args = (to_bytes32(approval.subject), entry[0], claim, self.stop_event)
+        threading.Thread(target=self._run, args=args, daemon=True).start()
         return self.status()
 
     def stop(self, claim: str) -> dict:
@@ -111,16 +118,16 @@ class SwarmManager:
         return self.status()
 
     # ------------------------------------------------------------ the swarm's life
-    def _run(self, creator_id: str) -> None:
-        plan = self.plan
+    def _run(self, creator_id: str, plan: SwarmPlan, claim: str, stop_event: threading.Event) -> None:
+        """One swarm's life. It keeps its own plan, claim and stop switch, never reading ones a later swarm set."""
         for i in range(plan.bots):
-            if self.stop_event.is_set():
+            if stop_event.is_set():
                 return
             brain, strategy = plan.workers[i % len(plan.workers)], STRATEGIES[i % len(STRATEGIES)]
             rules = BotRules(strategy=strategy, brain=brain, start_cash_usd=100_000_000, max_trade_usd=20_000_000,
                              max_loss_bps=1000, lease_seconds=plan.minutes * 60)
             try:
-                rec = self.launcher._create_bot(creator_id, rules, self.claim)  # same steps as a normal launch
+                rec = self.launcher._create_bot(creator_id, rules, claim)  # same steps as a normal launch
             except Exception:
                 log.exception("swarm worker %s failed to launch", i + 1)
                 self._note("flag", None, f"worker {i + 1} could not be launched; skipped it", "swarm")
@@ -128,9 +135,9 @@ class SwarmManager:
             self.bot_ids.append(rec.bot_id)
             self._note("launch", rec.bot_id, f"started {rec.ens_name} ({strategy}, {brain})", plan.mind)
         self.phase = "running"
-        while not self.stop_event.is_set() and self._alive_ids():
+        while not stop_event.is_set() and self._alive_ids():
             self.next_check_at = int(time.time() + self.check_every_s)
-            if self.stop_event.wait(self.check_every_s):
+            if stop_event.wait(self.check_every_s):
                 break
             self.check_once()
         if self.phase == "running":
@@ -163,7 +170,7 @@ class SwarmManager:
             self._note(action, bot_id, f"{row['ens_name']}: {reason}", by)
 
     def _note(self, action: str, bot_id: int | None, reason: str, by: str) -> None:
-        with self.lock:
+        with self.notes_lock:
             self.decisions.insert(0, Decision(int(time.time()), action, bot_id, reason, by))
             del self.decisions[40:]
 
