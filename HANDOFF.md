@@ -1,3 +1,25 @@
+# HANDOFF — MORNING CHECKLIST (Sat 7 Nov 2026, written 01:00 IST). Submission deadline 09:00, target 07:30.
+
+**State:** everything works live on Sepolia and was tested repeatedly overnight (see AGENTS.md log, 01:00 entry).
+Tests: 167 Python + 39 Foundry + 8 frontend, all passing. Brains in use: Jev (Gemma 4 31B, DeepSeek V4.1 Flash),
+Gemini 3.5 / 3.1 Flash-Lite, simple rule (docs/BENCHMARK.md). Claude is wired but hidden (no credit, by choice).
+
+**Left for the user (in order):**
+1. Deploy (5 min, docs/DEPLOY.md): copy `.env` to the VM (`scp …`), start the two services, add
+   `https://parable-demo.centralindia.cloudapp.azure.com/world/callback` in the World portal, stop the laptop server
+   (only ONE engine may use the wallet at a time).
+2. Make the GitHub repo public (Settings → bottom → Change visibility).
+3. 15 min before recording: start a swarm + a solo bot on the live site (docs/VIDEO_SCRIPT.md "Before recording").
+4. Record the 3:30 video following docs/VIDEO_SCRIPT.md (includes a live MCP part via Claude Code; setup command in docs/DEPLOY.md).
+5. Submit to ENS + Arkiv + World on the ETHGlobal dashboard with the live link, repo link and video.
+
+**Gotchas:** press Cmd+Shift+R if the page looks old. "Demo · no phone" approval needs WORLD_ALLOW_DEMO=1 (already in .env),
+max 3 demo launches per 10 minutes; demo bots are marked "demo". Returns look flat because the vault scores at the
+Chainlink price (barely moves on testnet) — say so in the video. Bot #12 shows approval "world" although it was
+approved in the global test mode before per-launch marking existed (the only such row).
+
+---
+
 # HANDOFF: CURRENT STATE (Fri 6 Nov 2026, ~21:00 IST, after commit fe419ee). Read this section first.
 
 **Built and pushed since the older notes below:**
