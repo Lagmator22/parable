@@ -13,3 +13,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: Codex completed Claude Code's theme-switch checklist: the saved theme is applied in the HTML head before React mounts, the View Transition snapshots the new theme, and the CSS reveals that page from the click point. Added a browser-environment test for browsers without View Transitions. User review pending.
 
 - 2026-11-06: Codex linked the React landing and menu to the existing `/classic` bot-launch page, and proxied that route and its static assets in Vite development. No engine code changed.
+
+- 2026-11-06: Codex revised the public-history card after user feedback. The three steps now share one row layout, larger numbered tiles, consistent title and description sizes, and tighter spacing in desktop and phone layouts. User review pending.

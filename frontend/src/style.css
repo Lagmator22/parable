@@ -45,3 +45,25 @@
 .visual-line{grid-template-columns:44px 1fr}
 @media(max-width:390px){.hero h1{font-size:clamp(43px,12vw,50px);white-space:normal}}
 @media(prefers-reduced-motion:reduce){::view-transition-new(root){animation:none}}
+
+/* One type scale and one repeated row pattern for the public-history card. */
+.hero-visual{padding:32px 36px}
+.visual-title{font-size:28px;line-height:1.2;padding:0 0 26px}
+.visual-line{grid-template-columns:64px minmax(0,1fr);align-items:center;gap:22px;min-height:138px;padding:25px 0}
+.visual-line:last-child{border-bottom:0;padding-bottom:0}
+.visual-line>span{
+  width:60px;height:60px;display:grid;place-items:center;
+  border:2px solid var(--outline);border-radius:6px;
+  background:var(--button);color:var(--button-ink);
+  font-size:25px;font-weight:800;letter-spacing:-.04em;
+}
+.visual-line strong{display:block;font-size:36px;line-height:1.1;letter-spacing:-.045em}
+.visual-line p{font-size:18px;line-height:1.4;margin:7px 0 0}
+@media(max-width:700px){
+  .hero-visual{padding:24px}
+  .visual-title{font-size:25px;padding-bottom:20px}
+  .visual-line{grid-template-columns:54px minmax(0,1fr);gap:16px;min-height:118px;padding:20px 0}
+  .visual-line>span{width:52px;height:52px;font-size:22px}
+  .visual-line strong{font-size:30px}
+  .visual-line p{font-size:17px}
+}
