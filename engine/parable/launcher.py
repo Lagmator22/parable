@@ -119,17 +119,27 @@ class Launcher:
             if not approval.approved:
                 raise ApprovalDenied(approval.reason)
             self.in_progress.add(pending_id)
-        try:
-            result = self._create_bot(to_bytes32(approval.subject), rules, claim)
-        except Exception:
-            log.exception("launch %s failed", pending_id)  # full detail stays in the server log
-            result = LaunchFailed("the launch failed while creating the bot on-chain; please try again")
+
+        def _birth_worker():
+            try:
+                result = self._create_bot(to_bytes32(approval.subject), rules, claim)
+            except Exception:
+                log.exception("launch %s failed", pending_id)  # full detail stays in the server log
+                result = LaunchFailed("the launch failed while creating the bot on-chain; please try again")
+            with self.lock:
+                self.in_progress.discard(pending_id)
+                self.finished[pending_id] = (_hash(claim), result)
+
+        worker = threading.Thread(target=_birth_worker, daemon=True)
+        worker.start()
+        worker.join(timeout=0.12)  # finishes at once in fast tests; on Sepolia returns 409 'approved: ...' right away
         with self.lock:
-            self.in_progress.discard(pending_id)
-            self.finished[pending_id] = (_hash(claim), result)
-        if isinstance(result, Exception):
-            raise result
-        return result
+            done = self.finished.get(pending_id)
+            if done is not None:
+                if isinstance(done[1], Exception):
+                    raise done[1]
+                return done[1]
+        raise ApprovalPending("approved: the bot is being born on-chain (about a minute)")
 
     def _create_bot(self, creator_id: str, rules: BotRules, claim: str) -> BotRecord:
         v = self.b.vault

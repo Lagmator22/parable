@@ -49,7 +49,11 @@ export function Launch({ info, brains, onBorn }: Props) {
           setTx(result.tx_url); onBorn(result.bot.creator_id); return;
         } catch (err) {
           if (err instanceof ApiError && err.status === 409) {
-            if (err.message.startsWith('approved:')) { setPhase('creating'); setMessage('World ID approved. Creating the bot on-chain. This can take about a minute.'); }
+            if (err.message.startsWith('approved:')) {
+              approvalTab?.close();
+              setPhase('creating');
+              setMessage('World ID approved ✓ — Creating the bot on Sepolia (ENSv2 badge + Vault registration, ~45s)…');
+            }
             else setMessage('Waiting for World ID approval. Keep the approval tab open.');
             await pause(2_000); continue;
           }
@@ -75,7 +79,7 @@ export function Launch({ info, brains, onBorn }: Props) {
           <label>Max loss (%)<input type="number" min="0.01" max="100" step="0.01" value={loss} onChange={event => setLoss(event.target.value)}/></label>
           <label>Lifetime (minutes)<input type="number" min="1" step="1" value={minutes} onChange={event => setMinutes(event.target.value)}/></label>
         </div>
-        <div className="form-foot"><ScrambleButton type="submit" label={phase === 'waiting' || phase === 'creating' ? 'Waiting for approval' : 'Approve and launch'} disabled={phase === 'waiting' || phase === 'creating' || available.length === 0} className="solid-action"/><p>World ID approves the creator. The vault then registers the bot and its limits.</p></div>
+        <div className="form-foot"><ScrambleButton type="submit" label={phase === 'creating' ? 'Creating bot on-chain…' : phase === 'waiting' ? 'Waiting for approval' : 'Approve and launch'} disabled={phase === 'waiting' || phase === 'creating' || available.length === 0} className="solid-action"/><p>World ID approves the creator. The vault then registers the bot and its limits.</p></div>
       </form>
       {message && <div className={`status-message ${phase === 'born' ? 'success' : ''}`} role="status">{message}{approvalUrl && <a href={approvalUrl} target="_blank" rel="noreferrer">Open World ID ↗</a>}{tx && <a href={tx} target="_blank" rel="noreferrer">View transaction ↗</a>}</div>}
     </div>

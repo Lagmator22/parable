@@ -18,7 +18,7 @@ def build_erc8004_feed(launcher) -> dict:
     for bot_id, live in list(launcher.live.items()):
         bots.setdefault(bot_id, live.record)
     try:
-        deaths = {d.bot_id: d for d in launcher.b.arkiv._deaths()}
+        deaths = {d.bot_id: d for d in launcher.b.arkiv.all_graves()}
     except Exception:
         deaths = {}
 
