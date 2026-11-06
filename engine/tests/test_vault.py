@@ -26,8 +26,9 @@ def test_decode_revert_reads_error_args():
     assert vault.decode_revert(err) == "NotBot"
 
 
-def test_decode_revert_unknown_returns_text():
-    assert vault.decode_revert(Exception("boom")) == "boom"
+def test_decode_revert_unknown_hides_raw_text():
+    # raw errors can contain node URLs or API keys, so they are never shown to users
+    assert vault.decode_revert(Exception("https://rpc.example/KEY123 boom")) == "UnknownError"
 
 
 def test_struct_to_dict_names_and_enums():

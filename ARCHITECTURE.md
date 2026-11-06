@@ -161,6 +161,17 @@
   Bot loop starts
 ```
 
+## 7b. Who is allowed to do what (security locks)
+```
+  Action                     Who can do it                 How we check
+  ─────────────────────────  ────────────────────────────  ───────────────────────────────────────
+  Approve a launch           only the person who started   secret claim code kept in their browser
+  Kill a bot                 only its creator              same secret code (owner token)
+  "Check loss" / "Expire"    ANYONE                        the vault only agrees if the rule is truly met
+  Write to the notebook      only Parable's server         Arkiv helper needs a password + local only
+  See error details          nobody (only the server log)  users see just the rule name, e.g. OverTradeLimit
+```
+
 ## 8. Holes we know about, and how we'll fix them (improvement pipeline)
 | # | Hole (plain words) | How bad | Fix / plan |
 |---|---|---|---|

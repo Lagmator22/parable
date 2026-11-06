@@ -45,6 +45,10 @@ def to_bytes32(text: str) -> str:
     return "0x" + hashlib.sha256(text.encode()).hexdigest()
 
 
+def _hash(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def creator_wallet(creator_id: str, secret: str) -> str:
     """One fixed wallet address per creator (the vault insists on one wallet per World identity).
     The key is derived with a SERVER SECRET, so nobody else can recompute it and kill this creator's bots."""
@@ -58,6 +62,7 @@ class LiveBot:
     key: str  # the bot's private key, memory only
     expires_at: int
     node: str
+    owner_hash: str = ""  # sha256 of the creator's claim code; needed to kill the bot
     stop: threading.Event = field(default_factory=threading.Event)
     dead: bool = False
 
@@ -95,9 +100,9 @@ class Launcher:
             self.pending.pop(pending_id, None)
             raise ApprovalDenied(approval.reason)
         self.pending.pop(pending_id, None)  # an approval can launch only one bot
-        return self._create_bot(to_bytes32(approval.subject), rules)
+        return self._create_bot(to_bytes32(approval.subject), rules, claim)
 
-    def _create_bot(self, creator_id: str, rules: BotRules) -> BotRecord:
+    def _create_bot(self, creator_id: str, rules: BotRules, claim: str) -> BotRecord:
         v = self.b.vault
         wallet = Account.create()  # fresh wallet for this bot; the bot is the only one who holds the key
         now = int(time.time())
@@ -118,7 +123,8 @@ class Launcher:
                            strategy=rules.strategy, rules=rules, status="alive", born_at=now, born_tx=tx)
         self.b.arkiv.put_bot(record, rules.lease_seconds)
         self.b.arkiv.put_event(BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name}))
-        bot = LiveBot(record=record, key="0x" + wallet.key.hex().removeprefix("0x"), expires_at=expires_at, node=node)
+        bot = LiveBot(record=record, key="0x" + wallet.key.hex().removeprefix("0x"), expires_at=expires_at, node=node,
+                      owner_hash=_hash(claim))
         self.live[bot_id] = bot
         self._start_runner(bot, rules)
         return record
@@ -144,7 +150,12 @@ class Launcher:
         threading.Thread(target=self.b.runner.run_bot, args=args, daemon=True).start()
 
     # ---------------------------------------------------------------- ending bots
-    def kill(self, bot_id: int) -> str:
+    def kill(self, bot_id: int, owner_token: str) -> str:
+        """Only the creator may kill (they hold the claim code from launch). Check and expire are open to anyone,
+        because the vault itself only lets them succeed when the bot is really over its loss limit or out of time."""
+        bot = self._get(bot_id)
+        if not hmac.compare_digest(bot.owner_hash, _hash(owner_token)):
+            raise LaunchError("only the bot's creator can kill it")
         return self._end(bot_id, self.b.vault.kill)
 
     def check(self, bot_id: int) -> str:

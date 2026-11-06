@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from parable.fake_chain import FakeRunner, fake_backends
-from parable.launcher import ApprovalDenied, ApprovalPending, Launcher
+from parable.launcher import LaunchError, ApprovalDenied, ApprovalPending, Launcher
 from parable.models import BotRules
 from parable.world_pass import Approval
 
@@ -71,7 +71,9 @@ def test_bot_trades_and_kill_goes_to_graveyard(setup):
     bot = lau.confirm_launch(pid, claim)
     time.sleep(0.2)
     assert any(e.kind == "trade" for e in lau.b.arkiv.events)
-    lau.kill(bot.bot_id)
+    with pytest.raises(LaunchError):
+        lau.kill(bot.bot_id, "not-the-owner")  # strangers cannot kill
+    lau.kill(bot.bot_id, claim)
     dead = lau.b.arkiv.graveyard(bot.creator_id)
     assert len(dead) == 1 and dead[0].cause == "killed"
     assert not lau.b.ens.is_valid(bot.ens_name, bot.bot_address)

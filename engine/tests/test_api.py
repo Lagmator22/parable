@@ -30,7 +30,8 @@ def launch(c, world):
     assert c.post(f"/api/launch/{pid}/confirm", params={"claim": "wrong"}).status_code == 404  # not the requester
     assert c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).status_code == 409  # not approved yet
     world.decide(pid, True)
-    return c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).json()["bot"]
+    out = c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).json()
+    return {**out["bot"], "owner_token": out["owner_token"]}
 
 
 def test_happy_path(client):
@@ -38,7 +39,8 @@ def test_happy_path(client):
     bot = launch(c, world)
     assert c.get("/api/bots", params={"creator": bot["creator_id"]}).json()[0]["bot_id"] == bot["bot_id"]
     assert c.post(f"/api/bots/{bot['bot_id']}/check").status_code == 409  # not over its limit
-    assert c.post(f"/api/bots/{bot['bot_id']}/kill").json()["ok"]
+    assert c.post(f"/api/bots/{bot['bot_id']}/kill", params={"token": "stranger"}).status_code == 404  # not the creator
+    assert c.post(f"/api/bots/{bot['bot_id']}/kill", params={"token": bot["owner_token"]}).json()["ok"]
     grave = c.get(f"/api/graveyard/{bot['creator_id']}").json()
     assert grave[0]["cause"] == "killed" and grave[0]["ens_name"] == bot["ens_name"]
     report = c.get("/api/report", params={"creator": bot["creator_id"]}).json()

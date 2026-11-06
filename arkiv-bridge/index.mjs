@@ -2,6 +2,7 @@
 // It signs with ARKIV_PRIVATE_KEY (repo-root .env), writes entities to the Rabdi testnet and queries them.
 // Listens on 127.0.0.1 only, so nothing outside this computer can make it spend our testnet funds.
 import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { createPublicClient, createWalletClient, ExpirationTime } from "@arkiv-network/sdk";
 import { rabdi } from "@arkiv-network/sdk/chains";
 import { and, eq } from "@arkiv-network/sdk/query";
@@ -13,6 +14,9 @@ for (const file of ["../.env", "../.env.arkiv-spike"]) { // repo-root .env, then
   try { process.loadEnvFile(new URL(file, import.meta.url)); } catch { /* file not there, fine */ }
 }
 const PORT = Number(process.env.ARKIV_BRIDGE_PORT ?? 8787);
+// SECURITY: every request must carry this shared password, so a website open in your browser can't use the bridge.
+const TOKEN = process.env.ARKIV_BRIDGE_TOKEN ?? "";
+if (TOKEN.length < 16) throw new Error("ARKIV_BRIDGE_TOKEN must be set in .env (16+ random characters)");
 const rawKey = process.env.ARKIV_PRIVATE_KEY ?? "";
 if (!rawKey) throw new Error("ARKIV_PRIVATE_KEY is not set");
 const account = privateKeyToAccount(rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`);
@@ -72,11 +76,22 @@ const routes = {
   "POST /query": query,
 };
 
+// Only our own Python engine may call us: right password, local Host, no browser Origin, JSON body.
+function allowed(req) {
+  const given = Buffer.from(req.headers["x-bridge-token"] ?? "");
+  const want = Buffer.from(TOKEN);
+  const goodToken = given.length === want.length && timingSafeEqual(given, want);
+  const goodHost = [`127.0.0.1:${PORT}`, `localhost:${PORT}`].includes(req.headers.host);
+  const isJson = req.method === "GET" || (req.headers["content-type"] ?? "").startsWith("application/json");
+  return goodToken && goodHost && !req.headers.origin && isJson;
+}
+
 http.createServer(async (req, res) => {
   let body = "";
   for await (const chunk of req) body += chunk;
   const handler = routes[`${req.method} ${req.url}`];
   try {
+    if (!allowed(req)) throw Object.assign(new Error("forbidden"), { status: 403 });
     if (!handler) throw Object.assign(new Error("not found"), { status: 404 });
     const out = await handler(body ? JSON.parse(body) : {});
     res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(out));

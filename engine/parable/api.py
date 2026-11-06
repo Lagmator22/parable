@@ -3,6 +3,7 @@ PARABLE_OFFLINE=1 swaps the chain for an in-memory simulation (the dashboard sho
 The "cheat" routes try things a dishonest creator would try; the vault must block each one.
 """
 
+import logging
 import os
 import secrets
 from contextlib import asynccontextmanager
@@ -21,6 +22,7 @@ from parable.models import BotRules
 
 STATIC = Path(__file__).parent / "static"
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
+log = logging.getLogger("parable.api")
 _launcher: Launcher | None = None
 
 
@@ -76,6 +78,7 @@ def vault_call(fn, *args):
     except LaunchError as err:
         raise HTTPException(404, str(err))
     except Exception as err:
+        log.warning("vault call failed: %r", err)  # full detail stays in the server log only
         raise HTTPException(409, get_launcher().b.vault.decode_revert(err))
 
 
@@ -102,7 +105,7 @@ def confirm(pending_id: str, claim: str):
         raise HTTPException(403, f"not approved: {err}")
     except LaunchError as err:
         raise HTTPException(404, str(err))
-    return {"bot": bot.model_dump(), "tx_url": tx_url(bot.born_tx)}
+    return {"bot": bot.model_dump(), "owner_token": claim, "tx_url": tx_url(bot.born_tx)}
 
 
 @app.get("/api/bots")
@@ -133,12 +136,14 @@ def report(creator: str | None = None, strategy: str | None = None):
 
 
 @app.post("/api/bots/{bot_id}/{action}")
-def end_bot(bot_id: int, action: str):
+def end_bot(bot_id: int, action: str, token: str = ""):
     lau = get_launcher()
-    actions = {"kill": lau.kill, "check": lau.check, "expire": lau.expire}
-    if action not in actions:
+    if action == "kill":  # creator only: needs the claim code their browser kept from launch
+        tx = vault_call(lau.kill, bot_id, token)
+    elif action in ("check", "expire"):  # anyone: the vault only allows it when the rule is really met
+        tx = vault_call(getattr(lau, action), bot_id)
+    else:
         raise HTTPException(404, "action must be kill, check or expire")
-    tx = vault_call(actions[action], bot_id)
     return {"ok": True, "tx_hash": tx, "tx_url": tx_url(tx)}
 
 

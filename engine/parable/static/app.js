@@ -52,8 +52,14 @@ async function refresh() {
   if (rep.ok) $("report").innerHTML = reportHtml(rep.body);
 }
 
+// Kill needs the secret owner code this browser got at launch. Check / expire are open to anyone.
+function ownerToken(id) {
+  try { return JSON.parse(localStorage.getItem("owners") || "{}")[id] || ""; } catch { return ""; }
+}
+
 async function act(id, action) {
-  const r = await api(`/api/bots/${id}/${action}`, "POST");
+  const token = action === "kill" ? `?token=${encodeURIComponent(ownerToken(id))}` : "";
+  const r = await api(`/api/bots/${id}/${action}${token}`, "POST");
   alert(r.ok ? `${action} done. tx: ${r.body.tx_hash}` : `Blocked by the vault: ${r.body.detail}`);
   refresh();
 }
@@ -72,7 +78,12 @@ async function launch() {
     clearInterval(timer);
     if (r.ok) {
       $("creator").value = r.body.bot.creator_id;
-      try { localStorage.setItem("creator", r.body.bot.creator_id); } catch {}
+      try {
+        localStorage.setItem("creator", r.body.bot.creator_id);
+        const owners = JSON.parse(localStorage.getItem("owners") || "{}");
+        owners[r.body.bot.bot_id] = r.body.owner_token;  // proves "I launched this bot" when killing it
+        localStorage.setItem("owners", JSON.stringify(owners));
+      } catch {}
       $("launch-msg").textContent = "Born: " + r.body.bot.ens_name;
     } else {
       $("launch-msg").textContent = "No bot launched: " + r.body.detail;

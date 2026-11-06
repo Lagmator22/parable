@@ -29,12 +29,14 @@ class ArkivError(RuntimeError):
 class Bridge:
     """Plain HTTP calls to the local arkiv-bridge. Swapped for a fake in tests."""
 
-    def __init__(self, url: str):
+    def __init__(self, url: str, token: str = ""):
         self.url = url.rstrip("/")
+        self.token = token or os.environ.get("ARKIV_BRIDGE_TOKEN", "")  # shared password with the bridge
 
     def call(self, method: str, path: str, payload: dict | None = None):
         try:
-            r = httpx.request(method, self.url + path, json=payload, timeout=60)
+            r = httpx.request(method, self.url + path, json=payload, timeout=60,
+                              headers={"x-bridge-token": self.token})
         except httpx.HTTPError as err:
             raise ArkivError(f"arkiv-bridge not reachable at {self.url} (cd arkiv-bridge && npm start): {err}") from err
         if r.status_code != 200:

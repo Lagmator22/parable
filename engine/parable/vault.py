@@ -175,4 +175,4 @@ def decode_revert(err: Exception) -> str:
     for selector, name in table.items():
         if selector in text.lower():
             return name
-    return text[:120]
+    return "UnknownError"  # never echo raw error text: it can contain node URLs or API keys
