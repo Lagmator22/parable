@@ -25,15 +25,6 @@ export function Launch({ info, brains, onBorn }: Props) {
   useEffect(() => () => { active.current = false; }, []);
   const available = brains.filter(item => item.available);
 
-  useEffect(() => {
-    if (phase !== 'creating') return;
-    setStepIdx(1);
-    const timer = window.setInterval(() => {
-      setStepIdx(prev => (prev < 5 ? prev + 1 : prev));
-    }, 7_000);
-    return () => window.clearInterval(timer);
-  }, [phase]);
-
   async function launch(event: React.FormEvent) {
     event.preventDefault();
     if (phase === 'waiting' || phase === 'creating') return;
@@ -64,7 +55,10 @@ export function Launch({ info, brains, onBorn }: Props) {
             if (err.message.startsWith('approved:')) {
               approvalTab?.close();
               setPhase('creating');
-              setMessage('World ID approved. Creating the bot on-chain (~45s)…');
+              // The server says how many launch steps REALLY finished ("step 4/6 done (...)"); no fake timer.
+              const done = Number(/step (\d)\/6/.exec(err.message)?.[1] ?? 1);
+              setStepIdx(done);
+              setMessage('World ID approved. Creating the bot on-chain (about a minute)…');
             }
             else setMessage('Waiting for World ID approval. Keep the approval tab open.');
             await pause(2_000); continue;

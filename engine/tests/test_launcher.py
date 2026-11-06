@@ -134,3 +134,20 @@ def test_sync_deaths_waits_quietly_on_not_expired_clock_skew(setup):
     lau.b.vault.decode_revert = lambda _e: "NotExpired"
     lau.sync_deaths()  # must not mark dead when Sepolia block timestamp is a few seconds behind
     assert not lau.live[bot.bot_id].dead
+
+
+def test_launch_progress_reports_real_steps(setup):
+    lau, world = setup
+    seen = []
+    real_issue = lau.b.ens.issue_badge
+
+    def slow_issue(*a, **k):
+        seen.append(lau.stage.get(pid))  # what the page would see while the ENS name is being made
+        return real_issue(*a, **k)
+
+    lau.b.ens.issue_badge = slow_issue
+    pid, claim = lau.start_launch(RULES)
+    world.decide(pid, True)
+    lau.confirm_launch(pid, claim)
+    assert seen == [(3, "fee money sent")]
+    assert lau.stage[pid][0] == 5

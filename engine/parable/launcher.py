@@ -84,7 +84,8 @@ class Launcher:
         self.lock = threading.Lock()
         self.counter = 0
         self.in_progress: set[str] = set()  # launches being created right now
-        self.finished: dict[str, tuple[str, object]] = {}  # pending_id -> (claim hash, bot or error)
+        self.finished: dict[str, tuple[str, object]] = {}
+        self.stage: dict[str, tuple[int, str]] = {}  # pending_id -> (steps done out of 6, what just finished)  # pending_id -> (claim hash, bot or error)
         self.outbox = Outbox()  # Arkiv writes that failed and will be retried (the vault already has them)
 
     # ---------------------------------------------------------------- launching
@@ -107,7 +108,7 @@ class Launcher:
                     raise done[1]
                 return done[1]
             if pending_id in self.in_progress:
-                raise ApprovalPending("approved: the bot is being born on-chain (about a minute)")
+                raise self._still_born(pending_id)
             entry = self.pending.get(pending_id)
             if entry is None or not hmac.compare_digest(entry[1], claim):
                 raise LaunchError("unknown launch id or wrong claim token")
@@ -122,7 +123,8 @@ class Launcher:
 
         def _birth_worker():
             try:
-                result = self._create_bot(to_bytes32(approval.subject), rules, claim)
+                result = self._create_bot(to_bytes32(approval.subject), rules, claim,
+                                          progress=lambda n, what: self.stage.__setitem__(pending_id, (n, what)))
             except Exception:
                 log.exception("launch %s failed", pending_id)  # full detail stays in the server log
                 result = LaunchFailed("the launch failed while creating the bot on-chain; please try again")
@@ -139,27 +141,37 @@ class Launcher:
                 if isinstance(done[1], Exception):
                     raise done[1]
                 return done[1]
-        raise ApprovalPending("approved: the bot is being born on-chain (about a minute)")
+        raise self._still_born(pending_id)
 
-    def _create_bot(self, creator_id: str, rules: BotRules, claim: str) -> BotRecord:
+    def _still_born(self, pending_id: str) -> ApprovalPending:
+        """The page reads "step N/6" to tick its progress list from REAL progress, never from a timer."""
+        done_steps, label = self.stage.get(pending_id, (1, "World ID approved"))
+        return ApprovalPending(f"approved: step {done_steps}/6 done ({label}); the bot is being born on-chain")
+
+    def _create_bot(self, creator_id: str, rules: BotRules, claim: str, progress=None) -> BotRecord:
+        step = progress or (lambda n, what: None)  # tells the page which launch steps really finished
         v = self.b.vault
         wallet = Account.create()  # fresh wallet for this bot; the bot is the only one who holds the key
         now = int(time.time())
         expires_at = now + rules.lease_seconds
         self.counter += 1
         label = f"bot-{self.counter}-{secrets.token_hex(2)}"
+        step(2, "bot wallet created")
         v.fund_gas(wallet.address)  # the bot needs a little ETH to pay gas for its own trades
+        step(3, "fee money sent")
         fp = code_fingerprint(rules)
         ens_name, node = self.b.ens.issue_badge(
             label, wallet.address, expires_at,
             {"strategy": rules.strategy, "brain": rules.brain, "max_loss_bps": str(rules.max_loss_bps), "code_hash": fp},
         )
+        step(4, f"ENS name {ens_name} issued")
         bot_id, tx = v.register_bot(
             bot_address=wallet.address, creator_id=creator_id,
             creator_wallet=creator_wallet(creator_id, self.secret), badge_node=node, expires_at=expires_at,
             start_cash_usd=rules.start_cash_usd, max_trade_usd=rules.max_trade_usd,
             max_loss_bps=rules.max_loss_bps, strategy_id=to_bytes32(rules.strategy),
         )
+        step(5, f"vault registered bot #{bot_id}")
         record = BotRecord(bot_id=bot_id, bot_address=wallet.address, creator_id=creator_id, ens_name=ens_name,
                            strategy=rules.strategy, rules=rules, status="alive", born_at=now, born_tx=tx)
         bot = LiveBot(record=record, key="0x" + wallet.key.hex().removeprefix("0x"), expires_at=expires_at, node=node,
