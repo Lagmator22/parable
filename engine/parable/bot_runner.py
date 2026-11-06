@@ -3,11 +3,13 @@ if the AI is unavailable or answers badly, a simple built-in rule decides instea
 The vault (not this file) enforces the real limits; clamping here just avoids silly requests.
 """
 
+import json
 import time
 from threading import Event
 from typing import Callable
 
 import anthropic
+import httpx
 
 from parable import vault
 from parable.config import get_settings
@@ -20,19 +22,19 @@ PRESETS = {
     "dip_buyer": "Buy when the price dipped below its recent high, sell some after it recovers.",
     "yolo": "Always trade the maximum allowed size, buying if you hold cash, selling if you hold ETH.",
 }
-DECISION_TOOL = {
-    "name": "decide_trade",
-    "description": "Decide the next paper trade.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "action": {"type": "string", "enum": ["buy", "sell", "hold"]},
-            "amount_usd": {"type": "integer", "description": "USD with 6 decimals, 1000000 = 1 USD"},
-            "reason": {"type": "string"},
-        },
-        "required": ["action", "amount_usd", "reason"],
+DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "action": {"type": "string", "enum": ["buy", "sell", "hold"]},
+        "amount_usd": {"type": "integer", "description": "USD with 6 decimals, 1000000 = 1 USD"},
+        "reason": {"type": "string"},
     },
+    "required": ["action", "amount_usd", "reason"],
+    "additionalProperties": False,
 }
+# strict=True makes Claude's tool input match the schema exactly.
+DECISION_TOOL = {"name": "decide_trade", "description": "Decide the next paper trade.",
+                 "input_schema": DECISION_SCHEMA, "strict": True}
 
 
 def eth_value_usd(state: dict) -> int:
@@ -87,23 +89,46 @@ def build_prompt(state: dict) -> str:
     )
 
 
-def llm_decide(state: dict) -> TradeDecision:
-    """Ask Claude, forcing it to answer through the decide_trade tool; Pydantic validates the result."""
+def claude_decide(state: dict) -> TradeDecision:
+    """Ask Claude. Thinking is on by default for Haiku 5.5, which rules out FORCING a tool, so we
+    offer the tool (auto) and ask for it in the prompt; low effort keeps it fast and cheap."""
     settings = get_settings()
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=LLM_TIMEOUT_S)
     reply = client.messages.create(
-        model=settings.bot_model, max_tokens=300, tools=[DECISION_TOOL],
-        tool_choice={"type": "tool", "name": "decide_trade"},
+        model=settings.bot_model, max_tokens=2000, tools=[DECISION_TOOL], tool_choice={"type": "auto"},
+        output_config={"effort": "low"},
         messages=[{"role": "user", "content": build_prompt(state)}],
     )
-    block = next(b for b in reply.content if b.type == "tool_use")
+    block = next(b for b in reply.content if b.type == "tool_use")  # no tool call -> error -> rule
     return TradeDecision.model_validate(block.input)
 
 
+def openai_compat_decide(state: dict) -> TradeDecision:
+    """Free/cheap option: any OpenAI-style chat API (Gemini, OpenRouter, Groq, Ollama). We ask for JSON only."""
+    settings = get_settings()
+    prompt = build_prompt(state).replace("Call decide_trade.", "Reply with ONLY a JSON object matching: "
+                                         + json.dumps(DECISION_SCHEMA["properties"]) + ".")
+    r = httpx.post(f"{settings.llm_base_url.rstrip('/')}/chat/completions", timeout=LLM_TIMEOUT_S,
+                   headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+                   json={"model": settings.llm_model, "messages": [{"role": "user", "content": prompt}],
+                         "response_format": {"type": "json_object"}})
+    r.raise_for_status()
+    text = r.json()["choices"][0]["message"]["content"]
+    return TradeDecision.model_validate_json(text.strip().removeprefix("```json").removesuffix("```").strip())
+
+
+def provider() -> str:
+    """Which brain to use. Empty setting = Claude if we have a key, otherwise the free rule."""
+    settings = get_settings()
+    return settings.bot_provider or ("anthropic" if settings.anthropic_api_key else "rule")
+
+
 def decide(state: dict) -> TradeDecision:
-    """LLM first; on ANY failure fall back to the rule. Result is always clamped."""
+    """AI first (if configured); on ANY failure fall back to the rule. Result is always clamped."""
+    brains = {"anthropic": claude_decide, "openai_compat": openai_compat_decide}
+    brain = brains.get(provider())
     try:
-        decision = llm_decide(state)
+        decision = brain(state) if brain else rule_decide(state)
     except Exception:
         decision = rule_decide(state)
     return clamp(decision, state)
