@@ -11,7 +11,7 @@ from pathlib import Path
 
 from eth_account import Account
 from fastapi import FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -64,6 +64,18 @@ async def lifespan(_app):
 
 app = FastAPI(title="Parable", lifespan=lifespan)
 app.include_router(world_pass.router)
+
+
+@app.exception_handler(Exception)
+async def any_error(_request, err: Exception):
+    """Never show a raw error or an HTML crash page: log it here, answer short JSON."""
+    from parable.arkiv_store import ArkivError
+
+    if isinstance(err, ArkivError):
+        log.warning("Arkiv unavailable: %s", err)
+        return JSONResponse({"detail": "the public record (Arkiv) is slow right now; try again in a moment"}, 503)
+    log.exception("unexpected server error")
+    return JSONResponse({"detail": "server error"}, 500)
 
 
 class LaunchRequest(BaseModel):

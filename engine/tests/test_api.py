@@ -145,3 +145,18 @@ def test_launch_survives_an_arkiv_outage(client):
     lau.b.arkiv.put_bot = real_put
     assert lau.outbox.flush() == 0
     assert [r.bot_id for r in lau.b.arkiv.records] == [1]
+
+
+def test_arkiv_outage_gives_short_json_not_a_crash_page(client):
+    from parable.arkiv_store import ArkivError
+
+    c, _, lau = client
+
+    def down(*a, **k):
+        raise ArkivError("arkiv-bridge not reachable at http://127.0.0.1:8787: timed out")
+
+    lau.b.arkiv.report_by_brain = down
+    c2 = TestClient(api.app, raise_server_exceptions=False)
+    r = c2.get("/api/report/brains")
+    assert r.status_code == 503 and "8787" not in r.text  # no internal addresses leak
+    assert r.json()["detail"].startswith("the public record")
