@@ -95,7 +95,7 @@ export default function App() {
       </section>
       <Launch info={d.info} brains={d.brains} onBorn={creator => { d.setCreator(creator); refreshAll(); }}/>
       <Live bots={d.bots} creator={d.creator} botEvents={d.botEvents} info={d.info} onRefresh={refreshAll}/>
-      <Register graves={d.graves} report={d.report} creator={d.creator} recordError={d.recordError}/>
+      <Register report={d.report} recordError={d.recordError}/>
       <Cheat bots={d.bots}/>
       <Swarm brains={d.brains} swarm={d.swarm} onUpdate={d.setSwarm} onBorn={refreshAll}/>
       <Bench series={d.series} comparison={d.comparison} recordError={d.recordError}/>

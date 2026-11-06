@@ -5,40 +5,32 @@ import { OutLink } from '../components/ui/Button';
 import { Section } from '../components/ui/Section';
 import { brainName, causeName, pct, request, trend, type BrainReport, type Grave, type Report } from './api';
 
-type Props = { graves: Grave[]; report: Report | null; creator: string; recordError: string };
+type Props = { report: Report | null; recordError: string };
 const lived = (s: number) => s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : `${(s / 3600).toFixed(1)} h`;
 
-export function Register({ graves, report, creator, recordError }: Props) {
-  const [everyone, setEveryone] = useState(false);
-  const [all, setAll] = useState<Grave[]>([]);
-  const [allError, setAllError] = useState('');
+export function Register({ report, recordError }: Props) {
+  // The register is public: every bot anyone ever launched on this vault, dead ones included.
+  const [rows, setRows] = useState<Grave[]>([]);
+  const [error, setError] = useState('');
   useEffect(() => {
-    if (!everyone) return;
     let on = true;
-    const load = () => { if (!document.hidden) request<Grave[]>('/api/graveyard/all').then(v => { if (on) { setAll(v); setAllError(''); } }).catch(e => { if (on) setAllError(e instanceof Error ? e.message : 'Could not load.'); }); };
+    const load = () => { if (!document.hidden) request<Grave[]>('/api/graveyard/all').then(v => { if (on) { setRows([...v].sort((a, b) => b.bot_id - a.bot_id)); setError(''); } })
+      .catch(e => { if (on) setError(e instanceof Error ? e.message : 'Could not load.'); }); };
     load();
-    const t = window.setInterval(load, 15_000);
+    const t = window.setInterval(load, 10_000);
     return () => { on = false; window.clearInterval(t); };
-  }, [everyone]);
-  const rows = [...(everyone ? all : graves)].sort((a, b) => b.bot_id - a.bot_id);
-  const problem = everyone ? allError : recordError;
+  }, []);
+  const problem = error || recordError;
 
   return <Section id="register" label="03 Register">
-    <div className="actions" style={{ justifyContent: 'space-between' }}>
-      <h2>The graveyard</h2>
-      <div className="toggle" role="group" aria-label="Whose bots">
-        <button type="button" aria-pressed={!everyone} onClick={() => setEveryone(false)}>Mine</button>
-        <button type="button" aria-pressed={everyone} onClick={() => setEveryone(true)}>Everyone’s</button>
-      </div>
-    </div>
-    <p className="lead">Every bot that stopped, and how. {report && (report.vault_count_matches
+    <h2>The graveyard</h2>
+    <p className="lead">Every bot that ever stopped on this vault, and how. Nobody can remove a row: the vault writes them, not the bots. {report && (report.vault_count_matches
       ? `The vault counts ${report.launched} bots and so does this list, so none are missing.`
       : 'This list and the vault’s count differ right now; it usually catches up within a minute.')}</p>
     {problem && <div className="box empty">{problem}</div>}
     <div className="box rows register">
       <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Lived</span><span>Return</span><span>How it ended</span><span/></div>
-      {!everyone && !creator ? <div className="empty">Launch a bot to start your record.</div>
-        : rows.length === 0 ? <div className="empty">{problem ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
+      {rows.length === 0 ? <div className="empty">{problem ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
         : rows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
           <span>{g.bot_id}</span><span className="struck">{g.ens_name}</span><span>{brainName(g.brain)}</span>
           <span>{lived(g.lifetime_s)}</span><span className={trend(g.pnl_bps)}>{pct(g.pnl_bps)}</span>

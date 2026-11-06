@@ -25,7 +25,9 @@ a:hover { color: var(--orange-text); }
 button, input { font: inherit; color: inherit; }
 h1, h2, h3, h4, p, dl, dd { margin: 0; }
 :focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
-::selection { background: var(--orange); color: var(--ink); }
+/* Selected text turns white on orange everywhere, including orange text and chart labels. */
+::selection { background: var(--orange); color: #fff; -webkit-text-fill-color: #fff; }
+svg text::selection { fill: #fff; }
 .mono, dd, time, td, .log { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .muted { color: var(--grey); }
 .up { color: var(--green); } .down, .refused { color: var(--orange-text); }
@@ -136,6 +138,7 @@ h1, h2, h3, h4, p, dl, dd { margin: 0; }
 .attempt:last-child { border-bottom: 0; }
 .attempt h3 { font-size: 20px; } .attempt p { font-size: 15px; opacity: .78; margin-top: 4px; }
 .attempt .answer { font: 14px var(--mono); }
+.proof-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; font: 12px var(--mono); opacity: .8; }
 .band .btn { border-color: var(--paper); background: var(--paper); color: var(--ink); }
 .band .btn:hover:not(:disabled) { background: var(--orange); border-color: var(--orange); color: #0b0b0b; }
 .band .btn:disabled { background: none; color: color-mix(in srgb, var(--paper) 55%, transparent); border-color: currentColor; }
@@ -150,6 +153,8 @@ h1, h2, h3, h4, p, dl, dd { margin: 0; }
 .chip[aria-pressed=true] { background: var(--ink); color: var(--paper); }
 .chip:disabled { border-style: dashed; color: var(--grey); border-color: var(--grey); cursor: not-allowed; }
 .stepper { display: inline-flex; border: 1px solid var(--ink); }
+.team .row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 8px 0; }
+.stepper button:disabled { opacity: .35; cursor: not-allowed; }
 .stepper button { width: 44px; height: 44px; border: 0; background: none; font-size: 18px; cursor: pointer; } .stepper button:hover { background: var(--ink); color: var(--paper); }
 .stepper output { min-width: 64px; display: grid; place-items: center; border-left: 1px solid var(--ink); border-right: 1px solid var(--ink); font: 500 16px var(--mono); }
 .swarm-table .row { grid-template-columns: 28px minmax(0, 3fr) minmax(0, 2fr) 80px 70px 70px 70px; }

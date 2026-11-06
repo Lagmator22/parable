@@ -34,6 +34,7 @@ export function Launch({ info, brains, onBorn }: Props) {
   const [approvalUrl, setApprovalUrl] = useState('');
   const [tx, setTx] = useState<string | null>(null);
   const active = useRef(true);
+  const cancelled = useRef(false);
   useEffect(() => () => { active.current = false; }, []);
   useEffect(() => {  // default to the AI that answered fastest in our benchmark, if it is set up
     const ok = brains.filter(b => b.available).map(b => b.brain);
@@ -57,14 +58,16 @@ export function Launch({ info, brains, onBorn }: Props) {
     if (busy || tooBig) return;
     const rules: Rules = { strategy: v.strategy, brain: v.brain, start_cash_usd: Math.round(v.cash * 1e6), max_trade_usd: Math.round(v.trade * 1e6),
       max_loss_bps: Math.round(v.loss * 100), lease_seconds: Math.round(v.life * 60) };  // dollars have 6 decimals; 1% = 100 bps
+    cancelled.current = false;
     setOpen(null); setPhase('waiting'); setDone(0); setTx(null); setApprovalUrl(''); setMessage('A World ID tab is opening. Approve the bot there.');
     const tab = window.open('', '_blank');
     try {
       const pending = await post<Pending>('/api/launch', rules);
       if (tab) tab.location.href = pending.approve_url;
-      else { setApprovalUrl(pending.approve_url); setMessage('Your browser blocked the new tab. Use the link below.'); }
+      else setMessage('Your browser blocked the new tab. Use the link below.');
+      setApprovalUrl(pending.approve_url);  // lets you reopen World ID if you closed that tab
       const deadline = Date.now() + 10 * 60_000;
-      while (active.current && Date.now() < deadline) {
+      while (active.current && !cancelled.current && Date.now() < deadline) {
         try {
           const r = await post<Confirmed>(`/api/launch/${encodeURIComponent(pending.pending_id)}/confirm`, undefined, { 'x-claim': pending.claim });
           if (!active.current) return;
@@ -76,11 +79,12 @@ export function Launch({ info, brains, onBorn }: Props) {
           if (err.message.startsWith('approved:')) {
             tab?.close(); setPhase('creating');
             setDone(Number(/step (\d)\/6/.exec(err.message)?.[1] ?? 1));
-            setMessage('Approved. Setting the bot up on Sepolia');
+            setMessage('Approved. Setting the bot up on Sepolia'); setApprovalUrl('');
           } else setMessage('Waiting for you to approve in the World ID tab');
           await pause(2_000);
         }
       }
+      if (cancelled.current) throw new Error('Cancelled. No bot was launched.');
       if (active.current) throw new Error('No approval within 10 minutes. Start again.');
     } catch (err) {
       tab?.close();
@@ -114,8 +118,10 @@ export function Launch({ info, brains, onBorn }: Props) {
         <span>{phase === 'creating' || phase === 'born' ? `step ${Math.min(done + (phase === 'born' ? 0 : 1), 6)} of 6` : ''}</span></div>
       {(phase === 'creating' || phase === 'born') && <ol className="steps">{STEPS.map((s, i) =>
         <li key={s} className={i < done ? 'done' : i === done ? 'now' : ''}><span>{i < done ? `${i + 1} done` : i === done ? <><span className="live"/> working</> : i + 1}</span>{s}</li>)}</ol>}
-      {(approvalUrl || tx) && <div className="chart-note">{approvalUrl && <a href={approvalUrl} target="_blank" rel="noreferrer">Open World ID</a>}
-        {tx && <a href={tx} target="_blank" rel="noreferrer">See the vault transaction</a>}</div>}
+      {phase === 'waiting' && <div className="box-head" style={{ borderBottom: 0, borderTop: '1px solid var(--ink)' }}><div className="actions">
+        {approvalUrl && <a className="btn btn-quiet" href={approvalUrl} target="_blank" rel="noreferrer">Open World ID again</a>}
+        <button type="button" className="btn" onClick={() => { cancelled.current = true; }}>Cancel</button></div></div>}
+      {tx && <div className="chart-note"><a href={tx} target="_blank" rel="noreferrer">See the vault transaction</a></div>}
     </div>}
   </Section>;
 }

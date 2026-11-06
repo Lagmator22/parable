@@ -1,5 +1,6 @@
-// Section 05, the swarm: pick a "mind" model and the worker bots' brains, approve once with World ID, then
-// watch it live: which workers are running, how they're doing, and every keep/stop decision with who made it.
+// Section 05, the swarm: pick one "mind" model, then build the team of workers like a cart (a brain and how
+// many of it), approve once with World ID, and watch it live: each worker's numbers and every keep/stop
+// decision with who made it (the mind, or the safety rule).
 import { useEffect, useRef, useState } from 'react';
 import { Section } from '../components/ui/Section';
 import { ApiError, brainName, pct, post, saveOwner, trend, type Brain, type Swarm as SwarmState } from './api';
@@ -7,56 +8,63 @@ import { ApiError, brainName, pct, post, saveOwner, trend, type Brain, type Swar
 type Props = { brains: Brain[]; swarm: SwarmState | null; onUpdate: (s: SwarmState) => void; onBorn: () => void };
 type Pending = { pending_id: string; claim: string; approve_url: string };
 const CLAIM_KEY = 'parable.swarm-claim';
+const MAX_WORKERS = 6;
 const pause = (ms: number) => new Promise<void>(r => window.setTimeout(r, ms));
 const readClaim = () => { try { return localStorage.getItem(CLAIM_KEY) || ''; } catch { return ''; } };
 const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-function Stepper({ value, set, min, max, unit }: { value: number; set: (n: number) => void; min: number; max: number; unit: string }) {
-  return <div className="actions"><div className="stepper">
-    <button type="button" aria-label={`Fewer ${unit}`} onClick={() => set(Math.max(min, value - (unit === 'minutes' ? 5 : 1)))}>−</button>
-    <output>{value}</output>
-    <button type="button" aria-label={`More ${unit}`} onClick={() => set(Math.min(max, value + (unit === 'minutes' ? 5 : 1)))}>+</button>
-  </div><span className="mono muted" style={{ fontSize: 13 }}>{unit}</span></div>;
+function Stepper({ value, set, min, max, step = 1, label }: { value: number; set: (n: number) => void; min: number; max: number; step?: number; label: string }) {
+  return <div className="stepper">
+    <button type="button" aria-label={`Less ${label}`} disabled={value <= min} onClick={() => set(Math.max(min, value - step))}>−</button>
+    <output aria-label={label}>{value}</output>
+    <button type="button" aria-label={`More ${label}`} disabled={value >= max} onClick={() => set(Math.min(max, value + step))}>+</button>
+  </div>;
 }
 
 export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
-  const ai = brains.filter(b => b.brain !== 'rule');
+  const ready = brains.filter(b => b.available);
   const [mind, setMind] = useState('');
-  const [workers, setWorkers] = useState<string[]>([]);
-  const [count, setCount] = useState(3);
+  const [team, setTeam] = useState<Record<string, number>>({});
   const [minutes, setMinutes] = useState(15);
   const [msg, setMsg] = useState('');
-  const [busy, setBusy] = useState(false);
-  const active = useRef(true);
-  useEffect(() => () => { active.current = false; }, []);
-  useEffect(() => {  // defaults: the strongest available mind, a fast AI worker plus the plain rule to compare against
-    const ok = brains.filter(b => b.available).map(b => b.brain);
+  const [waiting, setWaiting] = useState<{ url: string } | null>(null);
+  const cancelled = useRef(false);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {  // defaults: the strongest available mind; two fast AI workers plus the plain rule to compare against
+    const ok = ready.map(b => b.brain);
     if (!mind) setMind(['claude:claude-opus-5-5', 'claude:claude-sonnet-5-5', 'gemini:gemini-3.5-flash-lite', ...ok.filter(b => b !== 'rule')].find(b => ok.includes(b)) || '');
-    if (!workers.length) setWorkers(['gemini:gemini-3.5-flash-lite', 'rule'].filter(b => ok.includes(b)));
+    if (!Object.keys(team).length && ok.includes('gemini:gemini-3.5-flash-lite')) setTeam({ 'gemini:gemini-3.5-flash-lite': 2, ...(ok.includes('rule') ? { rule: 1 } : {}) });
   }, [brains]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {  // this browser started the swarm, so it may stop its workers too
     const claim = readClaim();
     if (claim && swarm?.bots) swarm.bots.forEach(b => saveOwner(b.bot_id, claim));
   }, [swarm?.bots?.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const total = Object.values(team).reduce((s, n) => s + n, 0);
+  const setCount = (brain: string, n: number) => setTeam(t => { const next = { ...t, [brain]: n }; if (n <= 0) delete next[brain]; return next; });
   const running = swarm?.phase === 'launching' || swarm?.phase === 'running';
-  const toggleWorker = (b: string) => setWorkers(w => w.includes(b) ? w.filter(x => x !== b) : [...w, b]);
 
   async function start() {
-    setBusy(true); setMsg('A World ID tab is opening. One approval covers the whole swarm.');
+    cancelled.current = false;
+    setMsg('A World ID tab is opening. One approval covers the whole swarm.');
     const tab = window.open('', '_blank');
     try {
-      const p = await post<Pending>('/api/swarm/start', { mind, workers, bots: count, minutes });
+      // The server takes the workers as a list and hands them out in order: ["gemini", "gemini", "rule"].
+      const workers = Object.entries(team).flatMap(([b, n]) => Array(n).fill(b));
+      const p = await post<Pending>('/api/swarm/start', { mind, workers, bots: workers.length, minutes });
       try { localStorage.setItem(CLAIM_KEY, p.claim); } catch { /* private window */ }
-      if (tab) tab.location.href = p.approve_url; else setMsg('Your browser blocked the tab. Allow pop-ups and try again.');
+      if (tab) tab.location.href = p.approve_url;
+      setWaiting({ url: p.approve_url });
       const deadline = Date.now() + 10 * 60_000;
-      while (active.current && Date.now() < deadline) {
+      while (alive.current && !cancelled.current && Date.now() < deadline) {
         try { onUpdate(await post<SwarmState>(`/api/swarm/${p.pending_id}/confirm`, undefined, { 'x-claim': p.claim })); tab?.close(); setMsg(''); onBorn(); return; }
         catch (err) { if (!(err instanceof ApiError && err.status === 409)) throw err; await pause(2_000); }
       }
+      if (cancelled.current) { setMsg('Cancelled. Nothing was started.'); return; }
       throw new Error('No approval within 10 minutes. Start again.');
-    } catch (err) { tab?.close(); if (active.current) setMsg(err instanceof Error ? err.message : 'Could not start the swarm.'); }
-    finally { if (active.current) setBusy(false); }
+    } catch (err) { tab?.close(); if (alive.current) setMsg(err instanceof Error ? err.message : 'Could not start the swarm.'); }
+    finally { if (alive.current) setWaiting(null); }
   }
 
   async function stop() {
@@ -69,24 +77,35 @@ export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
     <p className="lead">A mind model checks every worker each minute and decides who keeps trading. It has no extra powers: the vault still checks every trade, and every bot it stops stays on the register.</p>
     {!running && <div className="box">
       <div className="swarm-form">
-        <div><span className="field-label">The mind (decides keep or stop)</span><div className="chips">{ai.map(b =>
+        <div><span className="field-label">1 · The mind: which model decides keep or stop</span><div className="chips">{brains.filter(b => b.brain !== 'rule').map(b =>
           <button type="button" key={b.brain} className="chip" disabled={!b.available} aria-pressed={mind === b.brain} onClick={() => setMind(b.brain)}
             title={b.available ? '' : 'Not set up on this server'}>{brainName(b.brain)}</button>)}</div></div>
-        <div><span className="field-label">The workers’ brains (they take turns)</span><div className="chips">{brains.map(b =>
-          <button type="button" key={b.brain} className="chip" disabled={!b.available} aria-pressed={workers.includes(b.brain)} onClick={() => toggleWorker(b.brain)}>{brainName(b.brain)}</button>)}</div></div>
-        <div><span className="field-label">How many workers</span><Stepper value={count} set={setCount} min={1} max={6} unit="bots"/></div>
-        <div><span className="field-label">How long they live</span><Stepper value={minutes} set={setMinutes} min={5} max={120} unit="minutes"/></div>
+        <div><span className="field-label">2 · The workers: {total} of {MAX_WORKERS}</span>
+          <div className="rows team">{Object.keys(team).length === 0 ? <div className="empty">Add at least one worker below.</div> : Object.entries(team).map(([b, n]) =>
+            <div className="row" key={b}><span>{brainName(b)}</span>
+              <Stepper value={n} set={x => setCount(b, x)} min={0} max={n + MAX_WORKERS - total} label={`${brainName(b)} workers`}/></div>)}</div>
+          <span className="field-label" style={{ marginTop: 14 }}>Add a worker</span>
+          <div className="chips">{ready.filter(b => !team[b.brain]).map(b =>
+            <button type="button" key={b.brain} className="chip" disabled={total >= MAX_WORKERS} onClick={() => setCount(b.brain, 1)}>+ {brainName(b.brain)}</button>)}</div>
+        </div>
+        <div><span className="field-label">3 · How long the workers live</span>
+          <div className="actions"><Stepper value={minutes} set={setMinutes} min={5} max={120} step={5} label="minutes"/><span className="mono muted" style={{ fontSize: 13 }}>minutes</span></div></div>
+        <div><span className="field-label">What happens</span><p className="say">Each worker gets $100 of practice money and takes about a minute to set up on Sepolia. A minute after that, the mind starts checking.</p></div>
       </div>
       <div className="box-head" style={{ borderBottom: 0, borderTop: '1px solid var(--ink)' }}>
-        <button type="button" className="btn btn-solid" disabled={busy || !mind || workers.length === 0} onClick={() => void start()}>Approve swarm with World ID</button>
-        <span className="muted">{msg || `${count} bots × $100 practice money, ~1 minute each to set up on Sepolia`}</span>
+        {waiting ? <div className="actions">
+          <span><span className="live"/> Waiting for your World ID approval</span>
+          <a className="btn btn-quiet" href={waiting.url} target="_blank" rel="noreferrer">Open World ID again</a>
+          <button type="button" className="btn" onClick={() => { cancelled.current = true; }}>Cancel</button>
+        </div> : <button type="button" className="btn btn-solid" disabled={!mind || total === 0} onClick={() => void start()}>Approve swarm of {total} with World ID</button>}
+        <span className="muted">{msg}</span>
       </div>
     </div>}
     {swarm && swarm.phase !== 'idle' && swarm.plan && <div className="box">
       <div className="box-head">
         <span>{running && <span className="live"/>} {swarm.phase === 'launching' ? `Setting up workers: ${swarm.born} of ${swarm.total} born`
           : swarm.phase === 'running' ? `Running · mind: ${brainName(swarm.plan.mind)} · next check in ${swarm.next_check_in ?? '…'}s`
-          : swarm.phase === 'waiting' ? 'Waiting for World ID approval' : `Finished · mind: ${brainName(swarm.plan.mind)}`}</span>
+          : `Last swarm · mind: ${brainName(swarm.plan.mind)}`}</span>
         {running && readClaim() && <button type="button" className="btn" onClick={() => void stop()}>Stop the mind</button>}
       </div>
       <div className="rows swarm-table">
