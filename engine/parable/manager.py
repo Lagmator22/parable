@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from parable.bot_runner import GOOGLE_BASE, available_brains, code_fingerprint, extract_json
+from parable.bot_runner import GOOGLE_BASE, available_brains, extract_json
 from parable.config import get_settings
 from parable.models import BotRules
 
@@ -105,7 +105,7 @@ class SwarmManager:
                 self.claims[rec.bot_id] = claim
                 self.tracked_ids.append(rec.bot_id)
                 self._record("launch", rec.bot_id,
-                             f"spawned {rec.ens_name} ({strat}, {worker_brain}, code {code_fingerprint(rules)[:10]})")
+                             f"started {rec.ens_name} ({strat}, {worker_brain})")
 
         self.audit(mind)
         return self.status()
@@ -138,20 +138,20 @@ class SwarmManager:
             if rejected:
                 last_err = rejected[0].data.get("reason") or rejected[0].data.get("error") or "VaultRevert"
                 self._record("flag", bot_id,
-                             f"{rec.ens_name}: vault blocked {len(rejected)}x ({last_err}) — logged in Arkiv")
+                             f"{rec.ens_name}: the vault refused {len(rejected)} of its trades")
             if bot_id in self.launcher.live and not self.launcher.live[bot_id].dead:
                 if (pnl_bps <= -300 or len(rejected) >= 2) and bot_id in self.claims:
                     self.launcher.kill(bot_id, self.claims[bot_id])
                     self._record("kill", bot_id,
-                                 f"killed {rec.ens_name} (PnL {pnl_bps / 100:.1f}%, {len(rejected)} blocked) -> sent to graveyard")
+                                 f"stopped {rec.ens_name}: return {pnl_bps / 100:.1f}%, {len(rejected)} refused trades")
                 else:
                     summary = f"Bot {rec.ens_name} ({rec.strategy}): {len(trades)} trades, PnL {pnl_bps / 100:.1f}%."
                     note = ask_mind_reason(
                         mind, summary,
-                        f"{rec.ens_name}: alive, {len(trades)} trades, PnL {pnl_bps / 100:+.1f}% within badge limits",
+                        f"{rec.ens_name}: running, {len(trades)} trades, return {pnl_bps / 100:+.1f}%",
                     )
                     self._record("keep", bot_id, note)
             elif not rejected:
                 self._record("keep", bot_id,
-                             f"{rec.ens_name}: archived in Arkiv graveyard ({len(trades)} trades, PnL {pnl_bps / 100:+.1f}%)")
+                             f"{rec.ens_name}: in the graveyard, {len(trades)} trades, return {pnl_bps / 100:+.1f}%")
         return [d.to_dict() for d in self.decisions]
