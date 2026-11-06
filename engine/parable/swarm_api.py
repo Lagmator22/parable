@@ -49,6 +49,10 @@ def swarm_status():
 
 @router.post("/api/swarm/start")
 def swarm_start(req: SwarmRequest):
+    from parable import world_pass
+
+    if req.approval == "demo" and not (world_pass.demo_allowed() and world_pass.take_demo_slot()):
+        raise HTTPException(429, "demo approval is off or busy right now; approve with World ID")
     try:
         pid, claim = get_manager().start(req.mind, req.workers, req.bots, req.minutes, demo=req.approval == "demo")
     except LaunchError as err:

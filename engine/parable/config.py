@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     world_client_id: str = ""
     world_client_secret: str = ""
     world_mock: bool = False
+    world_allow_demo: bool = False  # demo approval (no World App, bots marked "demo"); see world_pass.demo_allowed
     anthropic_api_key: str = ""
     bot_model: str = "claude-haiku-5-5"
     # Every Claude model listed here becomes its own brain ("claude:<model>"), like the Gemini list.

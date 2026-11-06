@@ -147,8 +147,27 @@ def register_pending(pending_id: str, demo: bool = False) -> None:
 
 
 def demo_allowed() -> bool:
-    """Demo approval lets people try Parable without World App. Set WORLD_ALLOW_DEMO=0 to switch it off."""
-    return os.environ.get("WORLD_ALLOW_DEMO", "1") != "0"
+    """Demo approval lets people try Parable without World App. OFF unless WORLD_ALLOW_DEMO=1, because it skips
+    the human check and every launch spends the server's test ETH."""
+    from parable.config import get_settings
+
+    return os.environ.get("WORLD_ALLOW_DEMO", "") == "1" or get_settings().world_allow_demo
+
+
+DEMO_WINDOW_S, DEMO_MAX = 600, 3
+_demo_times: list[float] = []
+_demo_lock = threading.Lock()
+
+
+def take_demo_slot() -> bool:
+    """At most 3 demo launches per 10 minutes for the whole site, so a stranger can't drain the test wallet."""
+    now = time.time()
+    with _demo_lock:
+        _demo_times[:] = [t for t in _demo_times if now - t < DEMO_WINDOW_S]
+        if len(_demo_times) >= DEMO_MAX:
+            return False
+        _demo_times.append(now)
+        return True
 
 
 # ---------------------------------------------------------------- config

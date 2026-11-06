@@ -227,6 +227,7 @@ def test_mock_endpoint_refuses_unknown_state_without_flag(client):
 
 def test_demo_approval_works_only_for_launches_marked_demo(client, monkeypatch):
     monkeypatch.delenv("WORLD_MOCK", raising=False)
+    monkeypatch.setenv("WORLD_ALLOW_DEMO", "1")
     wp.register_pending("real-1")
     wp.register_pending("demo-1", demo=True)
     assert "Demo approval" not in client.get("/world/start", params={"purpose": "launch_bot", "ref": "real-1"}, follow_redirects=False).text
@@ -235,7 +236,10 @@ def test_demo_approval_works_only_for_launches_marked_demo(client, monkeypatch):
     state = page.text.split("name=state value='")[1].split("'")[0]
     client.post("/world/mock/decision", data={"state": state, "decision": "approve"})
     assert wp.get_approval("demo-1").approved and "demo" in wp.get_approval("demo-1").reason
+    from parable.config import get_settings
+
     monkeypatch.setenv("WORLD_ALLOW_DEMO", "0")
+    monkeypatch.setattr(get_settings(), "world_allow_demo", False)
     wp.register_pending("demo-2", demo=True)
     assert "Demo approval" not in client.get("/world/start", params={"purpose": "launch_bot", "ref": "demo-2"}, follow_redirects=False).text
 
@@ -258,3 +262,13 @@ def test_unconfigured_real_mode_fails_closed(client, monkeypatch):
 def test_unknown_launch_id_is_rejected(client):
     """World approval only works for launch ids that Parable's server created (no hijacking)."""
     assert client.get("/world/start", params={"purpose": "launch_bot", "ref": "never-created"}).status_code == 404
+
+
+def test_demo_is_off_by_default_and_rate_limited(monkeypatch):
+    from parable.config import get_settings
+
+    monkeypatch.delenv("WORLD_ALLOW_DEMO", raising=False)
+    monkeypatch.setattr(get_settings(), "world_allow_demo", False)
+    assert wp.demo_allowed() is False
+    monkeypatch.setattr(wp, "_demo_times", [])
+    assert [wp.take_demo_slot() for _ in range(4)] == [True, True, True, False]

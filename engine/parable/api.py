@@ -155,6 +155,8 @@ def launch(req: LaunchRequest):
         raise HTTPException(400, f"brain '{req.brain}' is not set up on this server")
     if req.approval not in ("world", "demo") or (req.approval == "demo" and not world_pass.demo_allowed()):
         raise HTTPException(400, "approval must be 'world', or 'demo' where this server allows it")
+    if req.approval == "demo" and not world_pass.take_demo_slot():
+        raise HTTPException(429, "too many demo launches right now; wait a few minutes or approve with World ID")
     pending_id, claim = get_launcher().start_launch(BotRules(**req.model_dump()))
     # the claim token stays in the requester's browser; only they can confirm this launch
     return {"pending_id": pending_id, "claim": claim,
@@ -348,9 +350,10 @@ def arena_run(req: ArenaRequest = ArenaRequest()):
 
 @app.get("/")
 def home():
-    """The new React site if it has been built (frontend/dist), otherwise the simple built-in dashboard."""
+    """The new React site if it has been built (frontend/dist), otherwise the simple built-in dashboard.
+    Never cached, so a browser always gets the latest page (the JS/CSS files have hashed names)."""
     built = FRONTEND / "index.html"
-    return FileResponse(built if built.exists() else STATIC / "index.html")
+    return FileResponse(built if built.exists() else STATIC / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/classic")
