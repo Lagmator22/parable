@@ -22,7 +22,9 @@ test('loads the public creator in a fresh browser and keeps a saved creator', as
   await act(async () => { root.render(<Probe />); });
   expect(host.textContent).toBe('0xpublic');
   expect(storage.get('parable.creator')).toBe('0xpublic');
-  expect(calls.some(url => url.includes('creator=0xpublic'))).toBe(true);
+  // Running bots and graves are public: the page asks for everyone's, not one creator's.
+  expect(calls).toContain('/api/bots?status=alive');
+  expect(calls).toContain('/api/graveyard/all');
   await act(async () => root.unmount());
 
   storage.set('parable.creator', '0xmine');

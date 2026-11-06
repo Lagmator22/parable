@@ -33,10 +33,11 @@ export function useDashboard() {
   }, []);
 
   const refreshLive = useCallback(async () => {
-    if (!creator || document.hidden || busy.current.live) return;
+    if (document.hidden || busy.current.live) return;
     busy.current.live = true;
     try {
-      const live = await request<Bot[]>(`/api/bots?creator=${encodeURIComponent(creator)}&status=alive`);
+      // Running bots are public, like the register: everyone sees every bot that is trading right now.
+      const live = await request<Bot[]>('/api/bots?status=alive');
       setBots(live);
       const events = await Promise.allSettled(live.map(bot => request<Event[]>(`/api/bots/${bot.bot_id}/events`)));
       const latest: Record<number, Event> = {};

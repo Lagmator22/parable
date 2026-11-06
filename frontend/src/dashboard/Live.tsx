@@ -22,7 +22,7 @@ export function describe(ev: Event): string {
 
 const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
-export function Live({ bots, creator, botEvents, info, onRefresh }: Props) {
+export function Live({ bots, botEvents, info, onRefresh }: Props) {
   const [busy, setBusy] = useState<number | null>(null);
   const [said, setSaid] = useState<Record<number, string>>({});
   const [now, setNow] = useState(Date.now());
@@ -41,8 +41,8 @@ export function Live({ bots, creator, botEvents, info, onRefresh }: Props) {
   }
 
   return <Section id="live" label="02 Running">
-    {!creator || bots.length === 0
-      ? <div className="box empty">{creator ? 'Nothing is running right now. Finished bots are on the register below.' : 'Launch a bot and it shows up here.'}</div>
+    {bots.length === 0
+      ? <div className="box empty">Nothing is running right now. Launch a bot, or read the finished ones on the register below.</div>
       : <div className="bot-list">{bots.map(bot => {
         const left = Math.max(0, Math.ceil(bot.born_at + bot.rules.lease_seconds - now / 1000));
         const share = Math.min(1, left / Math.max(1, bot.rules.lease_seconds));
