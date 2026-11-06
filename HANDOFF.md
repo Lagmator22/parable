@@ -1,157 +1,190 @@
-# HANDOFF: read this first (written Fri 6 Nov 2026, ~15:45 IST)
+# HANDOFF: read this first (updated Fri 6 Nov 2026, ~18:48 IST)
 
-You are taking over **Parable**, a solo ETHGlobal Mumbai 2026 project. The previous assistant (Claude Code, Opus)
-ran out of usage. Everything below is the current truth. Also read: `AGENTS.md` (rules + iteration log),
-`FINAL_PLAN.md` (locked plan + timeline + demo script), `JUDGING.md` / `../JUDGING.md` (prize criteria),
-`ARCHITECTURE.md` (diagrams), `INTERFACES.md` (module contracts), `docs/FRONTEND_CONTRACT.md` (API for the UI),
-`DEPLOYMENTS.md` (addresses + live proof links).
+You are auditing / taking over **Parable**, a solo ETHGlobal Mumbai 2026 project.
+Everything below is the **exact, verified truth** as of commit `53eb608` (plus this handoff update).
+Also read: `AGENTS.md` (rules + iteration log), `FINAL_PLAN.md` (locked plan + checklists + demo script),
+`JUDGING.md` / `../JUDGING.md` (prize criteria), `ARCHITECTURE.md` (diagrams), `INTERFACES.md` (module contracts),
+`docs/FRONTEND_CONTRACT.md` (API for the UI), `DEPLOYMENTS.md` (addresses + live proof links).
 
-## 0. Deadlines
-- Hacking ends **Sat 7 Nov 09:00 IST (hard)**. Our target: **submit by 07:30**.
-- Video 2–4 min (aim 2:30–2:55) in the user's own voice. Repo must be **made public** before submit
-  (GitHub `Lagmator22/parable` is private now). Steady commits required. `AI_USAGE.md` disclosure required.
-- Partner picks (max 3): **ENS + Arkiv + World**.
+---
 
-## 1. About the user (follow strictly)
+## 0. Deadlines & Submission Rules
+- Hacking ends **Sat 7 Nov 09:00 IST (hard)**. Target: **submit by 07:30 IST**.
+- Video 2–4 min (aim 2:30–2:55) in the user's own voice (no TTS, ≥720p, not recorded on a phone).
+- Repo must be **made public** before submit (GitHub `Lagmator22/parable` is currently private).
+- Steady commits required (we have 18+ clean, atomic commits). `AI_USAGE.md` disclosure updated at every step.
+- Partner picks (max 3): **ENS + Arkiv + World**. (Chainlink Sepolia ETH/USD feed is also used on-chain, not a prize pick.)
+
+---
+
+## 1. About the User (Follow Strictly)
 - Solo, new to web3/finance, strong agentic-AI dev (GSoC, OVAT). Prefers Python. Spent ~$400 to attend; wants to WIN.
-- **Very simple language always**: explain every jargon word once, short sentences, tables, small diagrams.
+- **Very simple language always**: explain every jargon word once, short sentences, tables, small ASCII diagrams.
 - Every install/run step must say **which folder** and **exactly where to click**.
-- **Be honest/ruthless** about odds, bugs and novelty. Never claim something works without proof.
+- **Be honest/ruthless** about odds, bugs, and novelty. Never claim something works without proof.
 - Code: small readable files (≤ ~300 lines), short functions, plain-English header comment per file, comments on the
   web3/finance "why". **Edge-case tests in the same commit as each feature.**
-- Before every commit: `cd ~/ethglobal/parable/engine && uv run pytest -q` and
-  `cd ~/ethglobal/parable/contracts && ~/.foundry/bin/forge test` (forge is not on PATH in non-login shells).
-- After each phase: commit + push; update `ARCHITECTURE.md` (diagrams only, simple words, holes table),
-  `AGENTS.md` section 0 iteration log, `AI_USAGE.md`; explain to the user simply.
-- User also has **OpenAI Codex** (GPT-6 Sol): delegate scoped tasks with a paste-ready prompt + say which model /
-  reasoning level to pick. Codex is currently building the **frontend** in `frontend/` (see section 6).
-- LLMs: free first (Gemini/Gemma). Anthropic key exists but **$0 credit**. Opus only for final eval / swarm mind.
+- Before every commit:
+  - `cd ~/ethglobal/parable/engine && uv run pytest -q` (**144 passed**)
+  - `cd ~/ethglobal/parable/contracts && ~/.foundry/bin/forge test` (**39 passed**; forge is not on PATH in non-login shells)
+  - `cd ~/ethglobal/parable/frontend && npm test && npm run build` (**5 passed**, builds `frontend/dist/`)
+- After each phase: commit + push; update `ARCHITECTURE.md`, `AGENTS.md` section 0 iteration log, `AI_USAGE.md`.
+- Note on other tools: **OpenAI Codex ran out of usage limits** around 18:08 IST right after finishing `ProofBar.tsx`,
+  `Swarm.tsx`, and `useDashboard.test.tsx`. Antigravity (Gemini) took over both backend and frontend from that point.
 
-## 2. Security rules (never break)
+---
+
+## 2. Security Rules (Never Break)
 - Never commit secrets. `.env` and `.env.*` are gitignored (except `.env.example`). Never print keys.
-- The operator wallet `0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570` is **test-only**: never real money.
-- Users never see raw errors (only short `detail` text / vault error names).
-- The auto-mode classifier blocked `curl | bash` installs and starting cloudflared tunnels: ask the user to run those.
+- Operator wallet `0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570` is **test-only**: never real money.
+- Users never see raw errors (only short `detail` text / decoded vault error names).
+- `arkiv-bridge` (`127.0.0.1:8787`) requires `x-bridge-token: <ARKIV_BRIDGE_TOKEN>`, checks local `Host`, and rejects any
+  browser `Origin` header.
 
-## 3. What Parable is (pitch)
+---
+
+## 3. What Parable Is (Pitch)
 "Every trading strategy has a graveyard. Parable is where bots can't lie about theirs."
 AI trading bots never touch money and never write their own record. A World ID human approves a launch → the bot
-gets a soulbound, expiring **ENSv2 name tag** (`bot-N-xxxx.parable.eth`) → the **ParableVault** contract (Sepolia)
-holds its practice money, checks the badge + limits on every trade, trades at the **Chainlink** ETH/USD price,
-measures loss itself and auto-kills at the loss limit → every birth / trade / blocked trade / death is written to
-**Arkiv** (public DB) → dead bots stay in a **graveyard** nobody can delete. Report cards count failed bots too and
-check "vault count = Arkiv count". "Agentic OS for trading" is an explanation only, not the headline.
-Novelty is the **combination** (prior art credited in FINAL_PLAN.md §10 / docs/NOVELTY_CHECK.md).
+gets a soulbound, expiring **ENSv2 name tag** (`bot-N-xxxx.parable.eth`) with a `code_hash` fingerprint → the
+**ParableVault** contract (Sepolia) holds its practice money, checks the badge + limits on every trade, trades at the
+**Chainlink** ETH/USD price, measures loss itself against the bot's high-water mark (`hwmUsd`), and auto-kills at the
+loss limit → every birth / trade / blocked trade / death is written to **Arkiv** (public DB) → dead bots stay in a
+**graveyard** nobody can delete. Report cards count failed bots too and verify `vault_count_matches: true`
+("vault count == Arkiv count").
 
-## 4. What works (proven live)
-- Vault + EnsV2BadgeOracle deployed and source-verified on Sepolia (addresses in DEPLOYMENTS.md).
-- ENS live spike: issue → read → valid → revoke → invalid. Parent `parable.eth` owned by operator.
-- Arkiv live spike: write bot/birth/death, read graveyard + report card back.
-- World ID real login worked ("approved: World ID verified server-side").
-- Brains: `rule` always; Gemini models via free key (best: `gemini:gemini-3.5-flash-lite` 6/6, 1.4 s).
-  Gemma had Google-side 500s. `claude` needs credit. `local` (Ollama) = very last stretch.
-- Tests: **135 Python + 39 Foundry pass** (last commit `ea8b64c`).
+---
 
-## 4b. UPDATE 15:55 IST: first real launches WORK
-- Arkiv access key added; bridge restarted; queries take 0.4 s. Real launches succeeded: vault totalBorn = 4
-  (bot 1 orphan, bot 2 died after its 10-min lease, bots 3 and 4 alive, brain `rule`). `/api/report/brains` works.
-- Open issues found:
-  1. Confirm waits for the Arkiv writes (outbox runs them synchronously); with a slow Arkiv the page sits on
-     "waiting" for minutes even though the bot is born. Improve: run launch-time Arkiv writes in a background thread.
-  2. **Sepolia Chainlink price changes ~once an hour**, so `momentum` / `dip_buyer` rule bots see a flat price and just
-     HOLD (no trades). For demos use strategy `yolo` (always trades) or a Gemini brain; consider adding a recent-price
-     feed for the bot's *decision* only (the vault still trades at Chainlink).
-  3. Old dashboard keeps "waiting for World ID approval" text until confirm returns; frontend (Codex) should show the
-     409 detail ("being born on-chain").
-  4. Queued Arkiv writes for bot 2 (grave/death) should flush automatically now; verify bot 2 is in the graveyard and
-     `repair: bot 1: record rebuilt` appears in /tmp/parable_app.log.
+## 4. Complete Verification Scoreboard (What Is Built & Proven Live)
 
-## 5. Current state of the FIRST REAL LAUNCH (most important open item)
-First real launch failed (World approved, then): nonce clash ("replacement transaction underpriced") + Arkiv overload
-+ the page re-polling confirm while the bot was still being born. **All fixed and pushed** (commits `ce5c144`, `ea8b64c`):
-- `engine/parable/tx_sender.py`: one shared sender per wallet (lock + remembered nonce + retry on clash). Used by
-  `vault.py` and `ens_badge.py`.
-- `arkiv_store.py`: reads cached 8 s; rows tagged `vault=<vault address>` (spike rows excluded); `events(bot_id)`;
-  `report_by_brain()` (2 queries total); alive rows live lease + 1 h.
-- `repair.py`: `Outbox` (failed Arkiv writes retried every 5 s, launch never fails because of Arkiv) and
-  `repair()` (once a minute: for vault bot ids 1..totalBorn rebuild missing records, expire finished leases,
-  write missing graves). This will fix **orphan bot #1** (in vault, no Arkiv record).
-- `launcher.confirm_launch` is idempotent (409 "being born on-chain" while in progress; returns same bot after).
-  Chain failures → `LaunchFailed` → 502 clean text.
-- `api.py`: `/api/info` (public addresses + strategies), `/api/report/brains`, `/api/bots/{id}/events`,
-  global JSON error handler (Arkiv down → 503 short message), serves `frontend/dist` at `/` when built,
-  old dashboard at `/classic` (also `/` until frontend is built).
+### 4.1 Test Suites (188 / 188 Passing)
+- **Solidity (`contracts/`):** `39 passed` (`24 ParableVaultTest + 15 EnsV2BadgeOracleTest`).
+- **Python (`engine/`):** `144 passed` across `test_api.py`, `test_arkiv_store.py`, `test_bot_runner.py`,
+  `test_ens_badge.py`, `test_launcher.py`, `test_repair.py`, `test_tx_sender.py`, `test_vault.py`, `test_world_pass.py`.
+- **Frontend (`frontend/`):** `5 passed` across 4 test files (`App.test.tsx`, `SelectMenu.test.tsx`, `api.test.ts`,
+  `useDashboard.test.tsx`), plus clean `tsc -b && vite build` into `frontend/dist/`.
 
-**BLOCKER right now:** Arkiv's public query endpoint hangs (60 s, no answer) — likely rate-limited after the flood.
-The RPC itself answers in <1 s. Fix = free access key. **User must:** create a key at
-https://hub.arkiv.network/access-keys and add `ARKIV_ACCESS_KEY=<key>` to `~/ethglobal/parable/.env`.
-Then restart the bridge (it already passes `rabdi({accessKey})`).
+### 4.2 On-Chain Sepolia & Arkiv State (Verified Live)
+- **`ParableVault` (Sepolia, verified):** `0x5432bE5713f358225d648eAb2EC9f699B25Ef317`
+- **`EnsV2BadgeOracle` (Sepolia, verified):** `0x087077ceBb69d8617b41735aAe24232697Af4EcA`
+- **ENSv2 Parent (`parable.eth`):** Registry `0x944523b32916F123923920d32aD92877341990f4`
+- **Chainlink ETH/USD Feed (Sepolia):** `0x694AA1769357215DE4FAC081bf1f309aDC325306` (live price ~$2,238.11)
+- **Operator & Arkiv Writer Wallet:** `0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570` (~0.0645 Sepolia ETH, ~10 tGLM)
+- **Verified Creator (`creator_id`):** `0xa4b35b7ef915b074605a2a193e3355a99b9072047a20d98b2f6a048fbd504411`
+- **4 Real Bots on Sepolia (`totalBorn = 4`, `totalDead = 4`, `vault_count_matches = true`):**
+  - `bot #1` (orphan from first launch before nonce fix → automatically rebuilt into Arkiv by `repair.py`!)
+  - `bot #2` (`bot-1-bcc2.parable.eth`) → expired after 10-min lease, archived in Arkiv graveyard
+  - `bot #3` (`bot-2-3da0.parable.eth`) → expired after 10-min lease, archived in Arkiv graveyard
+  - `bot #4` (`bot-3-fad9.parable.eth`) → expired after 10-min lease, archived in Arkiv graveyard
 
-**Next steps, in order:**
-1. After the key: restart bridge, check `curl` query through bridge returns fast (command in section 8).
-2. Watch `/tmp/parable_app.log` for `repair: bot 1: record rebuilt` (orphan fixed).
-3. User retries a real launch via the tunnel URL (hard refresh Cmd+Shift+R), brain `gemini:gemini-3.5-flash-lite`.
-   Verify: bot born (6 txs, ~1 min), trades appear, kill → grave in graveyard, report "vault count matches ✓".
-4. Then hardening + permanent public HTTPS deployment (ENS judges want a live demo link; register its
-   `/world/callback` in the World portal via "Manage" → redirect URIs; update `WORLD_REDIRECT_URI` in .env).
-5. Stretch in order: MCP server (Claude Code/Codex can launch/inspect bots) → Opus manager "swarm" → code
-   fingerprint → ERC-8004 → local models (very last).
-6. Docs for judging (section 7), video, prize-auditor check (`~/ethglobal/.claude/agents/prize-auditor.md`), submit.
+---
 
-## 6. Frontend (being built by Codex in parallel)
-- Codex got a full prompt; contract = `docs/FRONTEND_CONTRACT.md`. It works only in `frontend/`
-  (Vite + React + TS + Tailwind, components copied from quarry-ui / 21st.dev), commits prefixed `frontend:`,
-  notes in `frontend/AI_NOTES.md`, questions in `frontend/CONTRACT_QUESTIONS.md` (check it!).
-- Build output `frontend/dist/` (gitignored) is served by FastAPI at `/`. Dev: Vite proxy `/api` + `/world` to
-  `PARABLE_API` (default `http://127.0.0.1:8000`). Offline backend for UI work:
-  `cd ~/ethglobal/parable/engine && PARABLE_OFFLINE=1 uv run uvicorn parable.api:app --port 8001`.
-- `/api/manager` is reserved (planned) for the swarm panel; frontend hides it on 404.
-- Do NOT edit `frontend/` from the backend side; if the API must change, update the contract file in the same commit.
+## 5. Every Post-15:45 Fix & Feature Shipped (`9bae1e7` → `ad79033` → `503364f` → `9f76883` → `53eb608`)
 
-## 7. Judging must-haves (details in JUDGING.md)
-- **ENS "Best use of ENSv2"**: ENSv2 central (badges are the permission layer the vault checks), live demo link,
-  open source, bonus: agents as namespaces (each bot = subname). Show names, not addresses, in the UI.
-- **Arkiv "Build on Arkiv"** (first-time sponsor, 25% each): `/arkiv/friction.md`, `/arkiv/reach.md`,
-  `/arkiv/why-arkiv.md`, `/arkiv/how-you-use-arkiv.md` + `/arkiv/schema.md`. A user-facing feature must read from
-  Arkiv (the graveyard does). README: writer wallet + one runnable query. NOT WRITTEN YET.
-- **World Agent Pass / IDKit**: full journey + denied/expired path + backend validation + integration debrief
-  (`docs/WORLD_NOTES.md`, NOT WRITTEN YET).
-- Finalist signals: explain the problem, state numbers, mention tests, live demo, verifiable, 200+ word write-up.
-- README not written yet: problem, OS table, how it works, prior art, honest limits, deployments, how to run.
+### 5.1 Live-Run Bug Fixes (`9bae1e7`)
+1. **Non-blocking Arkiv birth writes (`engine/parable/launcher.py` & `api.py`):**
+   - `_create_bot()` now runs `put_bot` and `put_event(birth)` in a daemon thread (`writer.join(timeout=0.05)` so fast
+     unit tests still complete synchronously, while slow on-chain Arkiv writes never stall `/api/launch/{id}/confirm`).
+   - `GET /api/bots` merges in-memory `lau.live` bots so newly born bots appear immediately on the dashboard before the
+     background Arkiv write completes.
+2. **Flat Sepolia Chainlink Oracle Signal Ticks (`engine/parable/bot_runner.py`):**
+   - Because Sepolia Chainlink updates only ~once an hour, `signal_price()` injects small ±10–25 bps signal ticks into
+     the bot's `history` (and seeds 2 reference points on tick 1 in `read_state()`) when the oracle is unchanged between
+     ticks. Result: `momentum`, `dip_buyer`, `yolo`, and `gemini:gemini-3.5-flash-lite` all trade **immediately on tick 1**
+     upon birth, while `state["price"]` and the Sepolia `ParableVault` still settle strictly at the real Chainlink price.
+3. **Arkiv `extendEntity` TTL Fix (`arkiv_store.py` & `arkiv-bridge/index.mjs`):**
+   - Previously, `put_bot` added `+ 3600` seconds even to rebuilt dead bots (`180d + 1h`), causing `put_death`'s
+     `extendEntity(180d)` to revert with `would shorten its life`. Fixed in both `arkiv_store.py` (cap dead-bot TTL at
+     `DEATH_LIFETIME` and skip `_mark_dead` when already `"dead"`) and `arkiv-bridge/index.mjs` (ignore `shorten its life`
+     on `extendEntity`).
+4. **RPC Keep-Alive Reconnect & Clock-Skew Guard (`vault.py` & `launcher.py`):**
+   - `vault.py` `_read()` clears cached `_w3`/`_vault` and retries once on Tenderly idle `ConnectionResetError(54)`.
+   - `Launcher.sync_deaths()` catches `NotExpired` when `time.time() >= bot.expires_at` locally before the next 12s
+     Sepolia block timestamp catches up.
+   - `Launcher.report()` catches RPC errors on `vault.counts()` and degrades gracefully (`vault_count_matches=False`)
+     instead of crashing `/api/report` with 500.
 
-## 8. Running it (folders + commands)
-- Secrets: `~/ethglobal/parable/.env` (has operator key, Gemini key, Anthropic key ($0), World client id/secret,
-  `WORLD_MOCK=0`, `WORLD_REDIRECT_URI=https://director-tourist-dolls-feedback.trycloudflare.com/world/callback`,
-  vault/ENS addresses, `SEPOLIA_RPC_URL=https://sepolia.gateway.tenderly.co`, `PARABLE_CREATOR_SECRET`,
-  `ARKIV_BRIDGE_TOKEN`). Missing: `ARKIV_ACCESS_KEY`.
-- Arkiv bridge (Node, official SDK; Python SDK is incompatible with Rabdi):
-  `cd ~/ethglobal/parable/arkiv-bridge && nohup node index.mjs > /tmp/arkiv_bridge.log 2>&1 &` (port 8787).
-- Engine: `cd ~/ethglobal/parable/engine && nohup uv run uvicorn parable.api:app --host 127.0.0.1 --port 8000 > /tmp/parable_app.log 2>&1 &`
-  Before restarting, make sure the old one is gone: `ps aux | grep "[u]vicorn parable"` (an old copy once kept running).
-- Tunnel (user runs it in their own Warp tab): `cloudflared tunnel --url http://localhost:8000`.
-  A new tunnel = new URL → user adds `<url>/world/callback` in the World portal (Manage), and update `.env`.
-- Test a bridge query directly:
-  `TOKEN=$(grep ^ARKIV_BRIDGE_TOKEN= ~/ethglobal/parable/.env | cut -d= -f2); curl -s -m 30 -H "x-bridge-token: $TOKEN" -H "content-type: application/json" -d '{"schema":"parable.bot","where":{},"owner":"0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570"}' localhost:8787/query`
-- Wallet: operator had ~0.06 SepoliaETH (each launch ≈ 0.002–0.004 ETH). 10 tGLM on Arkiv.
+### 5.2 All Stretch Goals Completed (`ad79033`, `503364f`, `53eb608`)
+1. **Stretch #1 — MCP Server (`engine/parable/mcp_server.py`):**
+   - Built with `FastMCP("Parable")` (`uv run python -m parable.mcp_server`).
+   - Exposes 7 tools for Claude Code / Cursor / Codex: `launch_bot`, `list_bots`, `graveyard`, `report_card`,
+     `compare_brains`, `bot_events`, `kill_bot`.
+2. **Stretch #2 — AI Swarm Manager (`engine/parable/manager.py` + `frontend/src/dashboard/Swarm.tsx`):**
+   - `GET /api/manager` & `POST /api/manager/start`.
+   - Uses `gemini:gemini-3.5-flash-lite` (with automatic rule fallback) to audit all known bots, flag bots with
+     `rejected` vault events, and kill losing bots (`pnl_bps <= -300` or `>= 2` rejected trades) that it owns.
+   - Auto-populates on first `GET /api/manager` read and deduplicates `(bot_id, action)` so the `#swarm` panel is
+     populated immediately on page load.
+3. **Stretch #3 — Code Fingerprint on ENSv2 Badges (`bot_runner.py`, `launcher.py`, `api.py`):**
+   - `code_fingerprint(rules)` computes a short SHA-256 hash (`0x` + 16 hex chars) of `brain:strategy:preset:max_loss_bps`.
+   - Written to the ENSv2 subname text records (`code_hash` + `brain`) at badge issue time and returned on `/api/bots`
+     and `/api/graveyard/{creator_id}`. Displayed as an `ENSv2 code: 0x...` pill on every bot card and grave card.
+4. **Stretch #4 — Market Arena Benchmark Simulator (`engine/parable/arena.py` + `frontend/src/dashboard/Arena.tsx`):**
+   - Modeled after **nof1 Alpha Arena**, **Recall Network**, and **FinAI Agent Market Arena (AMA)**.
+   - Live at `GET /api/arena` and `POST /api/arena/run` (Section 04 `#arena` in the React UI).
+   - Runs 4 contenders (`Gemini 3.5 Flash-Lite · Momentum`, `Gemini 3.5 Flash-Lite · Dip Buyer`, `Rule Baseline · Dip Buyer`,
+     `Rule Baseline · YOLO (+ Rogue Attack)`) across 4 crypto market regimes:
+     - `flash_crash` (`$2,500 → $2,050`, `-18%`): aggressive dip-buyers breach the `-8%` max loss limit and get
+       **auto-killed by the Vault (`checkAndRevoke` → `loss_limit`)**, while a rogue `$150` trade is blocked (`OverTradeLimit`).
+     - `bull_breakout` (`$2,300 → $2,670`, `+16%`): Momentum & Gemini brains ride the rally and finish profitable (`+5.8%`).
+     - `whipsaw_chop` (`$2,400 → $2,550 → $2,220 → $2,460 → $2,090`): tests over-trading vs discipline.
+     - `live_binance`: fetches real 1-minute ETH/USDT candles from Binance's public API and amplifies moves 15x.
+   - Uses an isolated `FakeVault` + `FakeEns` so it never pollutes the real Sepolia/Arkiv `vault_count_matches` check.
+5. **Stretch #5 & #6 — ERC-8004 Agent & Graveyard Feed + Terminal TUI (`engine/parable/erc8004.py`):**
+   - `GET /api/erc8004` exports all living and dead Parable bots in ERC-8004 JSON format (`standard: "ERC-8004"`,
+     `chain: "eip155:11155111"`, including graveyard `causeOfDeath`, `pnlBps`, `codeHash`, `birthTx`, `deathTx`).
+   - `cd ~/ethglobal/parable/engine && uv run python -m parable.erc8004` prints an ASCII TUI table of all agents.
 
-## 9. Code map (engine/parable)
-`api.py` routes · `launcher.py` launch/kill/check/expire + death sync + poller · `repair.py` outbox + vault→Arkiv
-repair · `tx_sender.py` shared tx sender · `vault.py` web3 client · `ens_badge.py` ENSv2 badges · `arkiv_store.py`
-Arkiv client (via bridge) · `world_pass.py` World OIDC (PKCE, JWKS, mock mode) · `bot_runner.py` brains + bot loop
-(45 s interval, 30 s AI timeout, rule fallback) · `fake_chain.py` offline simulation · `static/` old dashboard.
-Contracts: `contracts/src/ParableVault.sol`, `contracts/src/adapters/EnsV2BadgeOracle.sol`, `contracts/script/Deploy.s.sol`.
-Units: USD 6 decimals, ETH 18, price 8, bps for percentages.
+### 5.3 Frontend Visibility Upgrades (`9f76883`, `53eb608`)
+- **Never-empty page in a fresh browser (`useDashboard.ts`):** `GET /api/info` returns `default_creator` (the latest
+  known creator on Sepolia/Arkiv) and `eth_price_usd`. When `localStorage.getItem("parable.creator")` is empty, the UI
+  automatically loads `info.default_creator` so judges immediately see the 4 Sepolia bots, graveyard, and report card.
+- **Sponsor Proof Bar (`ProofBar.tsx`):** Always-visible top bar displaying live **World ID** pass, **ENSv2 (`parable.eth`)**
+  oracle link, **Chainlink ETH/USD (`$2,238.11`)** Sepolia price, and **Arkiv Rabdi** explorer + writer address.
+- **Graveyard Scope Switch (`Record.tsx`):** Toggle between `"Creator record"` and `"All Graves on Arkiv"` (`/api/graveyard/all`).
+- **Always-Enabled Second Identity Cheat (`Live.tsx` & `api.py`):** `POST /api/cheat/second-identity` uses historical
+  bots from `arkiv.bots()` when no bots are currently alive, hitting the real Sepolia `ParableVault` and returning
+  `{"attack": "same person, new wallet", "blocked": true, "reason": "CreatorIdentityMismatch"}`.
 
-## 10. Swarm / Opus manager design (stretch, agreed)
-Opus = the "mind", called every 2–3 min with a summary (cheap). It launches 4–6 worker bots (cheap brains:
-Gemini flash-lite / Haiku, every 45 s; NOT full Sonnet agents), reads scores + timelines from Arkiv, kills losers,
-keeps winners, and **flags** suspicious bots (e.g. blocked 5× for OverTradeLimit = broken/malicious) and kills them.
-It has NO special powers: only creator actions (kill own bots, check, expire). **The vault stays the security guard.**
-All its kills land in its public graveyard: "even an AI manager can't hide its failed bots." Needs Anthropic credit
-(~$5); fallback mind = Gemini. Expose as `/api/manager` (GET status, POST start) per FRONTEND_CONTRACT.md.
+### 5.4 Mandatory Sponsor Judging Docs (All Written & Committed)
+- **Arkiv (`arkiv/`):** `schema.md`, `friction.md`, `reach.md`, `why-arkiv.md`, `how-you-use-arkiv.md`.
+- **World (`docs/WORLD_NOTES.md`):** Integration debrief (time to first success, friction, missing docs, top improvement).
+- **ENS (`docs/ENS_NOTES.md`):** ENSv2 Registry + UserPermissionedResolver bitmask architecture, `code_hash`, oracle checks.
+- **Root `README.md`:** Problem, OS table, architecture diagram, live Sepolia/ENS/Arkiv addresses, runnable Arkiv query,
+  test commands, prior art credit, and honest limits.
 
-## 11. Known limits (say them honestly in README)
-Server is trusted to say "this creator passed World ID" at registration · high-water mark updates only on trades ·
-bot keys are memory-only (server restart → bots just expire; repair records them) · World approvals in memory ·
-Sepolia Chainlink updates ~hourly (MAX_PRICE_AGE 7200) · spike test rows exist on Arkiv without the vault tag
-(now ignored).
+---
+
+## 6. How to Verify Everything Right Now (Commands for Claude)
+
+```bash
+# 1. Run all 3 test suites (144 Python + 39 Solidity + 5 Frontend = 188 tests)
+cd ~/ethglobal/parable/engine && uv run pytest -q
+cd ~/ethglobal/parable/contracts && ~/.foundry/bin/forge test
+cd ~/ethglobal/parable/frontend && npm test
+
+# 2. Check live running daemons (arkiv-bridge on :8787, uvicorn on :8000, cloudflared tunnel)
+ps aux | grep -E "uvicorn|arkiv|index.mjs|cloudflared" | grep -v grep
+
+# 3. Probe live endpoints on localhost:8000
+curl -s http://127.0.0.1:8000/api/info | jq .
+curl -s http://127.0.0.1:8000/api/manager | jq .
+curl -s http://127.0.0.1:8000/api/arena | jq .summary
+curl -s http://127.0.0.1:8000/api/erc8004 | jq '{standard, totalAgents, aliveAgents, deadAgents}'
+curl -s "http://127.0.0.1:8000/api/report?creator=0xa4b35b7ef915b074605a2a193e3355a99b9072047a20d98b2f6a048fbd504411" | jq .
+
+# 4. Run the terminal ERC-8004 scoreboard
+cd ~/ethglobal/parable/engine && uv run python -m parable.erc8004
+```
+
+---
+
+## 7. Remaining Pre-Submit Checklist (What Is Left)
+1. **Launch 1 more live bot on Sepolia (`bot #5`) from the UI:**
+   - Why: Bots `#1`–`#4` were launched before the tick-1 `signal_price` seed fix, so they expired with `0 trades`.
+     Launching 1 new bot (`yolo` or `momentum` + `gemini:gemini-3.5-flash-lite`, 10-min lease) will execute a real
+     Sepolia trade immediately on tick 1 (~5 seconds after birth) and write a `parable.event` (`kind="trade"`) with a
+     real Sepolia Etherscan tx hash to Arkiv.
+2. **Run `prize-auditor` check** against `JUDGING.md` / `reference/prizes-official-2026-11-05.txt`.
+3. **Make GitHub repo `Lagmator22/parable` public** before submitting on the ETHGlobal Hacker Dashboard.
+4. **Record the 2:30–2:55 demo video** in the user's own voice following `FINAL_PLAN.md` §7.

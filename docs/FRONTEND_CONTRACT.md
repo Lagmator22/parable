@@ -125,6 +125,13 @@ A real launch takes **30–90 s** after approval (6 blockchain transactions). Sh
 - `GET /api/manager` → the AI manager ("swarm") status: `{ "enabled": true, "mind": "gemini:gemini-3.5-flash-lite", "bots": [bot_id], "decisions": [{at, action: "launch|kill|flag|keep", bot_id, reason}] }`
 - `POST /api/manager/start` `{ "bots": 3, "minutes": 15 }` → runs an AI Swarm Manager audit pass (and spawns worker bots in offline mode), returning the updated status + decisions.
 
+### Market Arena Benchmark (LIVE — Stretch Goal #4)
+- `GET /api/arena` → returns the latest multi-agent Market Arena benchmark run (modeled after nof1 Alpha Arena, Recall Network, and FinAI Agent Market Arena) with `scenario`, `scenarios` (`flash_crash`, `bull_breakout`, `whipsaw_chop`, `live_binance`), `benchmarks`, `summary` (`launched`, `survived`, `killed_by_vault`, `profitable`, `best_pnl_bps`, `worst_pnl_bps`), and `contenders` (each with `ens_name`, `code_hash`, `status`, `cause`, `final_equity_usd`, `pnl_bps`, `trades`, `blocked`, and round-by-round `steps`).
+- `POST /api/arena/run` `{ "scenario": "flash_crash" | "bull_breakout" | "whipsaw_chop" | "live_binance", "live_llm": true }` → runs the 4 contenders head-to-head across the selected market price tape using Parable's exact Vault high-water-mark drawdown rules (`checkAndRevoke`).
+
+### ERC-8004 Trustless Agent & Graveyard Feed (LIVE — Stretch Goal #5)
+- `GET /api/erc8004` → exports all living and dead Parable agents in ERC-8004 JSON format (`standard: "ERC-8004"`, `chain: "eip155:11155111"`, `vault`, `ensNamespace`, `agents` with `reputation`).
+
 ## How the frontend is served
 - **Dev:** `cd ~/ethglobal/parable/frontend && npm run dev` (Vite on 5173) proxies `/api` and `/world` to
   `PARABLE_API` (default `http://127.0.0.1:8000`).
