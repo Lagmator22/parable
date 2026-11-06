@@ -77,7 +77,7 @@ export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
     <p className="lead">A mind model checks every worker each minute and decides who keeps trading. It has no extra powers: the vault still checks every trade, and every bot it stops stays on the register.</p>
     {!running && <div className="box">
       <div className="swarm-form">
-        <div><span className="field-label">1 · The mind: which model decides keep or stop</span><div className="chips">{brains.filter(b => b.brain !== 'rule').map(b =>
+        <div><span className="field-label">1 · The mind: which model decides keep or stop</span><div className="chips">{ready.filter(b => b.brain !== 'rule').map(b =>
           <button type="button" key={b.brain} className="chip" disabled={!b.available} aria-pressed={mind === b.brain} onClick={() => setMind(b.brain)}
             title={b.available ? '' : 'Not set up on this server'}>{brainName(b.brain)}</button>)}</div></div>
         <div><span className="field-label">2 · The workers: {total} of {MAX_WORKERS}</span>

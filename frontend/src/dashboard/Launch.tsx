@@ -19,7 +19,7 @@ const NUMBERS: Record<'cash' | 'trade' | 'loss' | 'life', { values: number[]; no
   life: { values: [5, 10, 30, 60], note: n => n >= 60 ? 'long enough to see the price move' : 'lifetime', show: n => `${n} minutes`, unit: 'minutes' },
 };
 const TITLES: Record<Field, [string, string]> = {
-  strategy: ['Pick a strategy', 'How it decides to buy or sell'], brain: ['Pick a brain', 'Dashed = not set up on this server'],
+  strategy: ['Pick a strategy', 'How it decides to buy or sell'], brain: ['Pick a brain', 'Jev scores buy/sell/hold; Gemini and Gemma write an answer'],
   cash: ['Starting cash', 'Practice money on Sepolia'], trade: ['Biggest single trade', 'The vault refuses anything bigger'],
   loss: ['Stop it if it loses', 'The vault ends the bot past this point'], life: ['How long it lives', 'Then it stops for good'],
 };
@@ -44,7 +44,8 @@ export function Launch({ info, brains, onBorn }: Props) {
 
   const options = (f: Field): Option[] => {
     if (f === 'strategy') return (info?.strategies || ['momentum', 'dip_buyer', 'yolo']).map(s => ({ value: s, label: s.replace('_', ' '), note: STRATEGY_NOTES[s] || '' }));
-    if (f === 'brain') return brains.map(b => ({ value: b.brain, label: brainName(b.brain), off: !b.available,
+    // Only brains this server can use right now (Claude stays hidden until its account has credit).
+    if (f === 'brain') return brains.filter(b => b.available).map(b => ({ value: b.brain, label: brainName(b.brain), off: !b.available,
       note: !b.available ? (b.brain.startsWith('claude') ? 'not set up: needs API credit' : b.brain.startsWith('jev') ? 'not set up: needs an Autoloops key' : 'not set up') : b.brain === 'rule' ? 'no AI, never fails' : b.brain.startsWith('jev') ? 'scores buy/sell/hold, very fast' : b.brain.split(':')[0] }));
     const n = NUMBERS[f];
     return n.values.map(x => ({ value: x, label: n.show(x), note: n.note(x) }));

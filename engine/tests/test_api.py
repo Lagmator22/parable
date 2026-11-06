@@ -238,11 +238,15 @@ def test_swarm_manager_and_mcp_tools(client, monkeypatch):
     # Only the starter can stop the mind.
     assert c.post("/api/swarm/stop", headers={"x-claim": "stranger"}).status_code == 403
     assert c.post("/api/swarm/stop", headers={"x-claim": claim}).json()["phase"] == "done"
-    # Verify MCP tools work against the same engine state.
-    assert mcp_server.list_bots()[0]["bot_id"] == bot["bot_id"]
-    assert mcp_server.report_card(creator_id=bot["creator_id"])["launched"] == 3  # 1 bot + 2 swarm workers, same person
-    assert mcp_server.bot_events(bot["bot_id"])[0]["kind"] in ("birth", "rejected", "trade")
-    assert len(mcp_server.compare_brains()) >= 1
+    # The MCP tools talk to the same running server as the website.
+    mcp_server.set_client(c)
+    try:
+        assert any(b["bot_id"] == mgr.bot_ids[1] for b in mcp_server.running_bots())
+        assert mcp_server.bot_history(bot["bot_id"])[-1]["kind"] == "birth"
+        assert len(mcp_server.compare_brains()) >= 1
+        assert mcp_server.status()["bots_ever"] >= 3
+    finally:
+        mcp_server.set_client(None)
     # Verify ERC-8004 export + TUI scoreboard include living and dead agents.
     from parable.erc8004 import render_tui
 
@@ -364,3 +368,26 @@ def test_graves_carry_trade_counts_and_arkiv_links(client, monkeypatch):
     monkeypatch.setattr(api, "offline", lambda: False)
     g = c.get("/api/graveyard/all").json()[0]
     assert g["trades"] >= 3 and g["arkiv_url"].startswith("https://rabdi.explorer.arkiv.network/entity/0x")
+
+
+def test_mcp_full_launch_cheat_and_stop_flow(client):
+    from parable import mcp_server
+
+    c, world, _ = client
+    mcp_server.set_client(c)
+    try:
+        started = mcp_server.launch_bot(brain="rule", strategy="yolo", minutes=5)
+        assert started["approve_url"].endswith(f"ref={started['pending_id']}")
+        assert mcp_server.confirm_launch(started["pending_id"], started["claim"])["state"] == "waiting for World ID"
+        world.decide(started["pending_id"], True)
+        born = mcp_server.confirm_launch(started["pending_id"], started["claim"])
+        assert born["state"] == "born" and born["ens_name"].endswith(".parable.eth")
+        assert mcp_server.try_to_cheat("unregistered")["reason"] == "NotBot"
+        assert mcp_server.try_to_cheat("over_limit")["reason"] == "OverTradeLimit"
+        assert "error" in mcp_server.try_to_cheat("nonsense")
+        assert mcp_server.stop_bot(born["bot_id"], "stranger")["status"] == 404  # not the creator
+        assert mcp_server.stop_bot(born["bot_id"], born["owner_token"])["ok"] is True
+        assert mcp_server.graveyard()[0]["ended"] == "killed"
+        assert mcp_server.launch_bot(brain="not-a-brain")["status"] == 422
+    finally:
+        mcp_server.set_client(None)
