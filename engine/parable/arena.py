@@ -1,4 +1,4 @@
-"""Market Arena Benchmark Simulator (inspired by nof1 Alpha Arena, Recall Network, and FinAI Agent Market Arena).
+"""Market Arena: a practice simulator, separate from the real vault.
 Runs a cohort of Parable bots head-to-head across realistic crypto market regimes (or live Binance ETH/USDT
 candles) using the exact ParableVault rules: ENS badge checks, per-trade limits, high-water-mark equity
 drawdown, and automatic vault kill (`loss_limit`) when a bot loses more than its allowed drawdown.
@@ -15,10 +15,7 @@ from parable.fake_chain import FakeEns, FakeVault
 from parable.models import BotRules
 
 BENCHMARKS = [
-    {"name": "Alpha Arena (nof1.ai)", "focus": "Live LLM crypto trading with identical starting capital & strict JSON schemas."},
-    {"name": "Recall Network", "focus": "Verifiable head-to-head agent skill arenas and dynamic leaderboards."},
-    {"name": "Agent Market Arena (FinAI)", "focus": "Multi-market streaming crypto/equity testbed for BUY/SELL/HOLD agents."},
-    {"name": "Parable Arena (Ours)", "focus": "Adds ENSv2 soulbound badges, Vault-enforced loss kills, and an undeletable Arkiv graveyard."},
+    {"name": "Parable Arena", "focus": "ENSv2 badges, vault-enforced loss limits and a permanent Arkiv graveyard, in a simulated market."},
 ]
 
 SCENARIOS: dict[str, dict] = {

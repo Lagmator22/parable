@@ -1,7 +1,7 @@
 """ENSv2 badge for each bot: an expiring, revocable, soulbound subname on Ethereum Sepolia.
 
 The operator owns a parent name (ENS_PARENT_NAME, e.g. parable.eth). Each bot gets `<label>.<parent>`.
-Role table and what is verified live: docs/ENS_NOTES.md. Adapted from Batas (MIT) for ENSv2 in web3.py.
+Role table and what is verified live: docs/ENS.md. Adapted from Batas (MIT) for ENSv2 in web3.py.
 """
 
 import re

@@ -4,6 +4,8 @@
 
 # Parable
 
+**Every trading strategy has a graveyard. Parable is where AI trading bots can't hide theirs.**
+
 Parable lets you launch AI trading bots with practice funds and inspect their full record on a shared vault. Choose a model, set a trading limit and an end time, then watch what the bot does. When it stops, its result appears in the public Graveyard. The dashboard also shows bots that are still running.
 
 The vault registers each bot before it can trade, checks its ENSv2 badge and limits on every trade, and calculates its return. Arkiv makes the history queryable, including losing and stopped bots. The dashboard compares the public record with the vault's bot count so readers can spot missing records.
@@ -11,6 +13,27 @@ The vault registers each bot before it can trade, checks its ENSv2 badge and lim
 **[Try the live demo](https://parable-demo.centralindia.cloudapp.azure.com)**. Built solo at ETHGlobal Mumbai 2026 on Ethereum Sepolia and Arkiv Rabdi.
 
 [![Parable dashboard showing launch controls and the vault's bot counts](docs/images/dashboard.png)](https://parable-demo.centralindia.cloudapp.azure.com)
+
+## Why it matters
+
+Anyone can sell an AI trading bot with a great track record: launch 20 bots, delete the 17 that lost, show the 3 that got lucky. Finance calls this survivorship bias, and it makes results look far better than they really were (Brown, Goetzmann, Ibbotson and Ross, *Review of Financial Studies*, 1992). Regulators push back too: the US SEC Marketing Rule (206(4)-1) requires advisers to show complete-period results, not selected highlights. AI agents make the problem bigger, because one person can start hundreds of bots in an afternoon.
+
+## What makes Parable different
+
+- **The money keeps the record, not the bot.** The vault that holds the funds registers every bot, settles every trade and measures every result. A bot cannot leave anything out of its record, because it never writes one.
+- **No ENS name, no trade.** The vault checks each bot's ENSv2 name on every trade. The name expires with the bot and is revoked when it stops.
+- **One person, one record.** World ID ties every launch to one real human. Starting over with a new wallet to escape a bad history is refused by the vault.
+- **Failures stay public.** Every stop is written to Arkiv as a read-only record, and the dashboard checks the vault's own bot count against the public list, so a missing bot shows up.
+
+## Who it's for
+
+| Who | What Parable gives them |
+|---|---|
+| People choosing a bot to buy or copy | Every bot a creator ran, including the ones that failed |
+| Honest bot builders | A shareable record that even they cannot edit |
+| Agent marketplaces and copy-trading apps | A simple listing rule: no full record, no listing |
+| Trading competitions | Every entry counted, one person per record |
+| AI agents (through [MCP](docs/MCP.md)) | Check a bot's full history before trusting or copying it |
 
 ## Try it
 
@@ -24,7 +47,7 @@ The vault registers each bot before it can trade, checks its ENSv2 badge and lim
 
 ![Launch form showing the model, trade cap, loss limit and World ID approval](docs/images/launch.png)
 
-![Graveyard showing ten stopped bots per page, their returns and explorer links](docs/images/graveyard.png)
+![Graveyard showing ten stopped bots per page with explorer links](docs/images/graveyard.png)
 
 </details>
 
@@ -41,7 +64,7 @@ You can also launch a group of bots supervised by a model in **Swarm**, or use t
 
 ## Verified demo results
 
-On 7 November 2026, the live API reported **23 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **56 trades**, **15 expiries** and **8 creator stops**. [Live report](https://parable-demo.centralindia.cloudapp.azure.com/api/report) and [Graveyard API](https://parable-demo.centralindia.cloudapp.azure.com/api/graveyard/all)
+On 7 November 2026 (03:30 IST), the live API reported **25 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **59 trades**, **16 expiries** and **9 creator stops**. The vault refused every cheat attempt from the dashboard: an unregistered trade, an over-limit trade and a second wallet for the same person. [Live report](https://parable-demo.centralindia.cloudapp.azure.com/api/report) and [Graveyard API](https://parable-demo.centralindia.cloudapp.azure.com/api/graveyard/all)
 
 Most bots ran for only a few minutes. The vault marks positions at the Chainlink feed price, which can stay flat during a short run. Returns are displayed to one decimal place, so a return such as −0.01% appears as 0.0%. The stop reason records how the bot ended, independently of its return.
 
