@@ -1,6 +1,6 @@
 """ENSv2 badge spike on Sepolia: issue -> read -> is_valid -> revoke -> is_valid false.
 
-Run:  cd engine && uv run python ../spikes/ens_spike.py
+Run:  cd engine && uv run python ../scripts/ens_spike.py
 
 Read-only checks always run. The write flow needs OPERATOR_PRIVATE_KEY (Sepolia ETH) and
 ENS_PARENT_NAME (an ENSv2 name the operator owns); without them it prints the manual steps and exits 0.

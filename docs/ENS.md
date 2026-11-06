@@ -1,10 +1,12 @@
 # ENS notes: bot badges on ENSv2 (Sepolia)
 
+**In one minute:** every bot gets a name like `bot-07.parable.eth`. It is an ENSv2 subname that runs out when the bot's time is up, can be taken back by Parable, and cannot be moved to someone else. The vault looks the name up before **every** trade, so a bot with no name or a dead name cannot trade. The name is the bot's ID card.
+
 ## What a badge is
 `bot-07.<ENS_PARENT_NAME>` (for example `bot-07.parable.eth`): an ENSv2 subname that is expiring, revocable by us, and soulbound. The vault reads it on every `trade()` through `EnsV2BadgeOracle`.
 
 ## Addresses (Ethereum Sepolia, chain 11155111)
-Source: https://docs.ens.domains/learn/deployments (ENSv2 Sepolia section, ABIs pinned to `ensdomains/contracts-v2@07e55a05`). Each one was checked for code with `eth_getCode` on 2026-11-06 (`spikes/ens_spike.py` re-checks on every run).
+Source: https://docs.ens.domains/learn/deployments (ENSv2 Sepolia section, ABIs pinned to `ensdomains/contracts-v2@07e55a05`). Each one was checked for code with `eth_getCode` on 2026-11-06 (`scripts/ens_spike.py` re-checks on every run).
 
 | Contract | Address |
 |---|---|
@@ -53,7 +55,7 @@ Contracts: `cd contracts && forge script script/Deploy.s.sol --rpc-url $SEPOLIA_
 3. `oracle.setVault(vault)` (operator only, one-shot, so the broadcaster must be the operator).
 It prints both addresses. Put them in `.env` as `ENS_BADGE_ORACLE` and `VAULT_ADDRESS`.
 
-**Extra step after deploy (not done by the script):** the oracle must be allowed to burn badges when the vault kills a bot. With `ENS_BADGE_ORACLE` set in `.env`, run `EnsBadge().setup_parent()` (or `uv run python ../spikes/ens_spike.py`): it attaches the subregistry, deploys the resolver, and grants the oracle `ROLE_UNREGISTER` on the subregistry root. Re-running is safe. Without this grant `revoke` still marks the badge dead locally, it just cannot burn the ENS name.
+**Extra step after deploy (not done by the script):** the oracle must be allowed to burn badges when the vault kills a bot. With `ENS_BADGE_ORACLE` set in `.env`, run `EnsBadge().setup_parent()` (or `uv run python ../scripts/ens_spike.py`): it attaches the subregistry, deploys the resolver, and grants the oracle `ROLE_UNREGISTER` on the subregistry root. Re-running is safe. Without this grant `revoke` still marks the badge dead locally, it just cannot burn the ENS name.
 
 **Fallback if ENS is blocked:** `USE_DEV_ORACLE=1` deploys `AlwaysValidBadgeOracle` instead (every badge counts as valid, no `setVault`). Dev only, and say so in the demo.
 

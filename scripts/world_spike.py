@@ -1,6 +1,6 @@
 """World ID spike: run the real OIDC flow end to end against World.
 
-Usage (from engine/):  uv run python ../spikes/world_spike.py
+Usage (from engine/):  uv run python ../scripts/world_spike.py
 Needs WORLD_CLIENT_ID and WORLD_CLIENT_SECRET in the repo-root .env. Without them it
 prints the portal setup steps and exits 0.
 """

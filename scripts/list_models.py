@@ -1,6 +1,6 @@
 """Lists the model IDs your GEMINI_API_KEY can use, and checks if a local Ollama server answers.
 
-Run:  cd engine && uv run python ../spikes/list_models.py
+Run:  cd engine && uv run python ../scripts/list_models.py
 Gemini flash and Gemma 4 models are marked with <<<. The key is never printed.
 """
 

@@ -9,8 +9,8 @@ Gemini 3.5 / 3.1 Flash-Lite, simple rule (docs/BENCHMARK.md). Claude is wired bu
    `https://parable-demo.centralindia.cloudapp.azure.com/world/callback` in the World portal, stop the laptop server
    (only ONE engine may use the wallet at a time).
 2. Make the GitHub repo public (Settings → bottom → Change visibility).
-3. 15 min before recording: start a swarm + a solo bot on the live site (docs/VIDEO_SCRIPT.md "Before recording").
-4. Record the 3:30 video following docs/VIDEO_SCRIPT.md (includes a live MCP part via Claude Code; setup command in docs/DEPLOY.md).
+3. 15 min before recording: start a swarm + a solo bot on the live site (internal/VIDEO_SCRIPT.md "Before recording").
+4. Record the 3:30 video following internal/VIDEO_SCRIPT.md (includes a live MCP part via Claude Code; setup command in docs/DEPLOY.md).
 5. Submit to ENS + Arkiv + World on the ETHGlobal dashboard with the live link, repo link and video.
 
 **Gotchas:** press Cmd+Shift+R if the page looks old. "Demo · no phone" approval needs WORLD_ALLOW_DEMO=1 (already in .env),
@@ -30,7 +30,7 @@ approved in the global test mode before per-launch marking existed (the only suc
 - Swarm v2 (`engine/parable/manager.py`, routes in `swarm_api.py`): pick mind + worker brains, ONE World ID approval launches all workers on Sepolia, mind checks every 60 s, safety rule (−3% or 2 refusals) overrides it, live status. Race condition found by security review: fixed + test.
 - Live graph recorder (`engine/parable/series.py`): every 10 s, each bot's vault value AND its holdings at the live Coinbase price; ETH market vs Chainlink. In memory only.
 - Launch progress shows the server's REAL steps ("step N/6 done"), never a timer.
-- Tests: **153 Python + 39 Foundry + 8 frontend** pass. API contract: `docs/FRONTEND_CONTRACT.md` (bottom section has swarm + series routes).
+- Tests: **153 Python + 39 Foundry + 8 frontend** pass. API contract: `internal/FRONTEND_CONTRACT.md` (bottom section has swarm + series routes).
 
 **Decisions locked with the user:** practice money on Sepolia only; the register is ALWAYS public (future work: choose public/private at birth, never after results); "real platform" = roadmap line "next, the vault swaps on Uniswap itself" (a centralized exchange would break the guarantee, do not promise it).
 
@@ -42,9 +42,9 @@ approved in the global test mode before per-launch marking existed (the only suc
 
 You are auditing / taking over **Parable**, a solo ETHGlobal Mumbai 2026 project.
 Everything below is the **exact, verified truth** as of commit `53eb608` (plus this handoff update).
-Also read: `AGENTS.md` (rules + iteration log), `FINAL_PLAN.md` (locked plan + checklists + demo script),
+Also read: `internal/AGENTS.md` (rules + iteration log), `FINAL_PLAN.md` (locked plan + checklists + demo script),
 `JUDGING.md` / `../JUDGING.md` (prize criteria), `ARCHITECTURE.md` (diagrams), `INTERFACES.md` (module contracts),
-`docs/FRONTEND_CONTRACT.md` (API for the UI), `DEPLOYMENTS.md` (addresses + live proof links).
+`internal/FRONTEND_CONTRACT.md` (API for the UI), `docs/DEPLOYMENTS.md` (addresses + live proof links).
 
 ---
 
@@ -68,7 +68,7 @@ Also read: `AGENTS.md` (rules + iteration log), `FINAL_PLAN.md` (locked plan + c
   - `cd ~/ethglobal/parable/engine && uv run pytest -q` (**144 passed**)
   - `cd ~/ethglobal/parable/contracts && ~/.foundry/bin/forge test` (**39 passed**; forge is not on PATH in non-login shells)
   - `cd ~/ethglobal/parable/frontend && npm test && npm run build` (**5 passed**, builds `frontend/dist/`)
-- After each phase: commit + push; update `ARCHITECTURE.md`, `AGENTS.md` section 0 iteration log, `AI_USAGE.md`.
+- After each phase: commit + push; update `ARCHITECTURE.md`, `internal/AGENTS.md` section 0 iteration log, `AI_USAGE.md`.
 - Note on other tools: **OpenAI Codex ran out of usage limits** around 18:08 IST right after finishing `ProofBar.tsx`,
   `Swarm.tsx`, and `useDashboard.test.tsx`. Antigravity (Gemini) took over both backend and frontend from that point.
 
@@ -188,8 +188,8 @@ loss limit → every birth / trade / blocked trade / death is written to **Arkiv
 
 ### 5.4 Mandatory Sponsor Judging Docs (All Written & Committed)
 - **Arkiv (`arkiv/`):** `schema.md`, `friction.md`, `reach.md`, `why-arkiv.md`, `how-you-use-arkiv.md`.
-- **World (`docs/WORLD_NOTES.md`):** Integration debrief (time to first success, friction, missing docs, top improvement).
-- **ENS (`docs/ENS_NOTES.md`):** ENSv2 Registry + UserPermissionedResolver bitmask architecture, `code_hash`, oracle checks.
+- **World (`docs/WORLD.md`):** Integration debrief (time to first success, friction, missing docs, top improvement).
+- **ENS (`docs/ENS.md`):** ENSv2 Registry + UserPermissionedResolver bitmask architecture, `code_hash`, oracle checks.
 - **Root `README.md`:** Problem, OS table, architecture diagram, live Sepolia/ENS/Arkiv addresses, runnable Arkiv query,
   test commands, prior art credit, and honest limits.
 

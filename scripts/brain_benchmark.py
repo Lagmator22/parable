@@ -1,6 +1,6 @@
 """Runs every configured brain on the same 6 fixed market scenarios and prints one comparison table.
 
-Run:  cd engine && uv run python ../spikes/brain_benchmark.py
+Run:  cd engine && uv run python ../scripts/brain_benchmark.py
 Uses the real APIs for AI brains (costs a few tiny calls). Keys are read from the repo-root .env
 through settings and are never printed. A failed answer (error, garbage, rate limit) counts as a fallback.
 """

@@ -18,7 +18,7 @@ engine/                    Python package `parable` (uv project; deps already in
   parable/world_pass.py    World ID Agent Pass approval (FastAPI router)
   parable/bot_runner.py    bot loop: LLM decision + rule fallback
   parable/api.py           FastAPI app wiring everything
-spikes/                    standalone proof scripts per sponsor
+scripts/                    standalone proof scripts per sponsor
 arkiv/                     Arkiv judging files
 ```
 

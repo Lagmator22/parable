@@ -44,4 +44,4 @@ This is testnet practice money. Next: the vault trades on a real exchange like U
 - **AI help** is disclosed in AI_USAGE.md.
 
 ## Partner prizes to select
-ENS (Best use of ENSv2), Arkiv (Build on Arkiv), World (Agent Pass / World ID). Sponsor docs: `docs/ENS_NOTES.md`, `arkiv/*.md`, `docs/WORLD_NOTES.md`.
+ENS (Best use of ENSv2), Arkiv (Build on Arkiv), World (Agent Pass / World ID). Sponsor docs: `docs/ENS.md`, `arkiv/*.md`, `docs/WORLD.md`.

@@ -1,5 +1,7 @@
 # World ID Agent Pass & IDKit: Integration Notes and Debrief
 
+**In one minute:** a person proves with World ID that they are a real, unique human, once per bot launch. That person gets one fixed creator ID in the vault. If they try to start fresh with a new wallet to hide their dead bots, the vault refuses (`CreatorIdentityMismatch`). No passport upload, no KYC: only "one human, one record". For demos without a phone there is a clearly marked "demo" approval.
+
 **Status:** **Verified live on 2026-11-06** with a registered World Developer Portal client (`WORLD_MOCK=0`) over a public HTTPS tunnel, plus full offline/mock support (`WORLD_MOCK=1`) for local testing.
 
 ---

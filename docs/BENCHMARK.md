@@ -1,7 +1,7 @@
 # Brain benchmark (run Sat 7 Nov 2026, 00:25 IST)
 
 Every brain answered the same 6 market situations (steady rise, steady fall, sharp dip, flat, spike then crash, low cash).
-Real API calls; script: `cd engine && uv run python ../spikes/brain_benchmark.py`. A "valid" answer is a well-formed
+Real API calls; script: `cd engine && uv run python ../scripts/brain_benchmark.py`. A "valid" answer is a well-formed
 buy/sell/hold decision; anything else (error, rate limit, garbage) would make the bot fall back to the simple rule.
 
 | Brain | Valid | Avg time | Notes |

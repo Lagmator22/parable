@@ -1,7 +1,7 @@
 """Arkiv spike: write a bot, a birth event and a death to the Rabdi testnet through arkiv-bridge,
 then read the graveyard and report card back.
 
-Run (two terminals):  cd arkiv-bridge && npm start      then      cd engine && uv run python ../spikes/arkiv_spike.py
+Run (two terminals):  cd arkiv-bridge && npm start      then      cd engine && uv run python ../scripts/arkiv_spike.py
 If the writer wallet has no tGLM the script runs the read-only checks, prints the faucet step and exits 0.
 """
 

@@ -110,7 +110,7 @@ Partners (max 3): **ENS · Arkiv · World**. Trades are priced by Chainlink's ET
 | Time | Do | Done when |
 |---|---|---|
 | **12:00–12:45** | Accounts: Sepolia ETH (faucet), Anthropic key, Arkiv faucet + access key, World Agent Pass portal app, ENSv2 Sepolia name. **Show this plan to the ENS / Arkiv / World mentors** ("has this been done? what would make you pick it?") | Keys in `.env`; mentor feedback noted below |
-| **12:45–15:00** | **Risk checks**, ≤40 min each: (1) ENSv2 subname create / expiry / revoke from Python (read Batas, MIT); (2) Arkiv create + query + expiry from Python; (3) World Agent Pass verify in FastAPI; (4) read the Chainlink ETH/USD price on Sepolia | Each one has a working script in `spikes/` |
+| **12:45–15:00** | **Risk checks**, ≤40 min each: (1) ENSv2 subname create / expiry / revoke from Python (read Batas, MIT); (2) Arkiv create + query + expiry from Python; (3) World Agent Pass verify in FastAPI; (4) read the Chainlink ETH/USD price on Sepolia | Each one has a working script in `scripts/` |
 | **15:00** | **DECISION GATE**: any red → use the fallback (section 8) | Logged in this file |
 | 15:00–19:00 | Vault contract + Foundry tests + deploy + verify | Tests pass; verified address in README |
 | 19:00–22:00 | Engine: launch flow (World → ENS → vault → Arkiv), bot loop with fallback, death handling | One bot born → trades → dies, fully recorded |
