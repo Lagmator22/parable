@@ -123,3 +123,14 @@ def test_chain_failure_becomes_a_clean_error(setup):
     assert "underpriced" not in str(err.value)  # raw chain errors never reach the user
     with pytest.raises(LaunchFailed):
         lau.confirm_launch(pid, claim)  # asking again gives the same answer, no second attempt
+
+
+def test_sync_deaths_waits_quietly_on_not_expired_clock_skew(setup):
+    lau, world = setup
+    pid, claim = lau.start_launch(BotRules(**{**RULES.model_dump(), "lease_seconds": 0}))
+    world.decide(pid, True)
+    bot = lau.confirm_launch(pid, claim)
+    lau.b.vault.expire = lambda _id: (_ for _ in ()).throw(RuntimeError("NotExpired"))
+    lau.b.vault.decode_revert = lambda _e: "NotExpired"
+    lau.sync_deaths()  # must not mark dead when Sepolia block timestamp is a few seconds behind
+    assert not lau.live[bot.bot_id].dead

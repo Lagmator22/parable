@@ -194,12 +194,27 @@ def decide(state: dict, brain: str = "rule") -> TradeDecision:
     return clamp(decision, state)
 
 
+# Sepolia's Chainlink ETH/USD feed updates only ~once an hour. When the oracle price is unchanged between
+# 45s bot ticks, we add a small tick (in bps) to the signal history so momentum and dip_buyer strategies can
+# act during a short demo lease. The vault contract on Sepolia ALWAYS trades at the real Chainlink price.
+FLAT_ORACLE_TICKS_BPS = (-18, -12, 15, 25, -10, 20, -22, 18)
+
+
+def signal_price(oracle_price: int, history: list[int]) -> int:
+    """Use the Chainlink price directly when it moves; otherwise add a small tick so short demos see signals."""
+    if not history or oracle_price != history[0] and oracle_price not in history[-2:]:
+        return oracle_price
+    bps = FLAT_ORACLE_TICKS_BPS[(len(history) - 1) % len(FLAT_ORACLE_TICKS_BPS)]
+    return oracle_price * (10_000 + bps) // 10_000
+
+
 def read_state(bot_id: int, rules: BotRules, history: list[int]) -> tuple[dict, dict]:
     """Collect everything the decision needs from the vault. Returns (state, raw bot record)."""
     bot = vault.get_bot(bot_id)
-    history.append(vault.price())
+    oracle = vault.price()
+    history.append(signal_price(oracle, history))
     state = {
-        "strategy": rules.strategy, "history": history[-12:], "price": history[-1],
+        "strategy": rules.strategy, "history": history[-12:], "price": oracle,
         "cash_usd": bot["cashUsd"], "eth_wei": bot["ethWei"], "equity_usd": vault.equity(bot_id),
         "max_trade_usd": bot["maxTradeUsd"], "max_loss_bps": bot["maxLossBps"],
     }

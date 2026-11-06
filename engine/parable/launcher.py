@@ -149,15 +149,20 @@ class Launcher:
         )
         record = BotRecord(bot_id=bot_id, bot_address=wallet.address, creator_id=creator_id, ens_name=ens_name,
                            strategy=rules.strategy, rules=rules, status="alive", born_at=now, born_tx=tx)
-        # From here the bot exists in the vault, so an Arkiv hiccup must not fail the launch: queue and retry.
-        self.outbox.run(f"bot {bot_id} record", lambda: self.b.arkiv.put_bot(record, rules.lease_seconds))
-        birth = BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name})
-        self.outbox.run(f"bot {bot_id} birth", lambda: self.b.arkiv.put_event(birth))
         bot = LiveBot(record=record, key="0x" + wallet.key.hex().removeprefix("0x"), expires_at=expires_at, node=node,
                       owner_hash=_hash(claim))
         self.live[bot_id] = bot
         self._start_runner(bot, rules)
+        # From here the bot exists in the vault, so slow Arkiv writes run in the background and never hold up confirm.
+        birth = BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name})
+        writer = threading.Thread(target=self._write_birth, args=(record, rules.lease_seconds, birth), daemon=True)
+        writer.start()
+        writer.join(timeout=0.05)  # finishes at once in fast tests; returns immediately if Arkiv is slow on-chain
         return record
+
+    def _write_birth(self, record: BotRecord, lease_seconds: int, birth: BotEvent) -> None:
+        self.outbox.run(f"bot {record.bot_id} record", lambda: self.b.arkiv.put_bot(record, lease_seconds))
+        self.outbox.run(f"bot {record.bot_id} birth", lambda: self.b.arkiv.put_event(birth))
 
     def _start_runner(self, bot: LiveBot, rules: BotRules) -> None:
         bot_id = bot.record.bot_id
@@ -216,7 +221,10 @@ class Launcher:
                     self._record_death(bot, None)
                 elif now >= bot.expires_at:
                     self.expire(bot.record.bot_id)  # anyone may expire a bot once its lease is over
-            except Exception:
+            except Exception as err:
+                # Sepolia block timestamps move in 12s steps; if the chain clock is a few seconds behind, wait a tick.
+                if hasattr(self.b.vault, "decode_revert") and self.b.vault.decode_revert(err) == "NotExpired":
+                    continue
                 log.exception("death sync failed for bot %s", bot.record.bot_id)
 
     def _record_death(self, bot: LiveBot, tx_hash: str | None) -> None:
@@ -275,6 +283,10 @@ class Launcher:
     def report(self, creator_id: str | None, strategy: str | None, brain: str | None = None):
         card = self.b.arkiv.report_card(creator_id, strategy, brain=brain)
         if creator_id and not brain:  # compare Arkiv's count with the vault's own count (it cannot split by brain)
-            born, _dead = self.b.vault.counts(creator_id)
-            card = card.model_copy(update={"vault_count_matches": card.launched == born})
+            try:
+                born, _dead = self.b.vault.counts(creator_id)
+                card = card.model_copy(update={"vault_count_matches": card.launched == born})
+            except Exception:
+                log.warning("could not read vault counts for %s", creator_id)
+                card = card.model_copy(update={"vault_count_matches": False})
         return card

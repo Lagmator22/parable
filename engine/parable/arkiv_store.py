@@ -115,15 +115,15 @@ class ArkivStore:
     # -- writes
 
     def put_bot(self, rec: BotRecord, lease_seconds: int) -> str:
-        """Alive bots expire with their lease, so the 'alive' list cleans itself."""
+        """Alive bots expire with their lease (+1h grace), while rebuilt dead bots keep their full grave lifetime."""
         attrs = {
             "bot_id": _n("u256", rec.bot_id), "bot_address": ["addr", rec.bot_address],
             "creator_id": _s(_creator(rec.creator_id)), "ens_name": _s(rec.ens_name),
-            "strategy": _s(rec.strategy), "brain": _s(rec.rules.brain), "status": _s("alive"), "born_at": _n("u64", rec.born_at),
-            "vault_tx": _s(rec.born_tx.lower()),
+            "strategy": _s(rec.strategy), "brain": _s(rec.rules.brain), "status": _s(rec.status),
+            "born_at": _n("u64", rec.born_at), "vault_tx": _s(rec.born_tx.lower()),
         }
-        # +1 hour of grace, so the row is still there when the death is written (or repaired) after the lease
-        return self._create(BOT, attrs, lease_seconds + 3600, rec.model_dump_json())
+        ttl = lease_seconds + 3600 if rec.status == "alive" else min(lease_seconds, DEATH_LIFETIME)
+        return self._create(BOT, attrs, ttl, rec.model_dump_json())
 
     def put_event(self, ev: BotEvent) -> str:
         attrs = {"bot_id": _n("u256", ev.bot_id), "kind": _s(ev.kind), "at": _n("u64", ev.at)}
@@ -147,7 +147,7 @@ class ArkivStore:
             "vault_tx": _s(d.tx_hash.lower()),
         }
         key = self._create(DEATH, attrs, DEATH_LIFETIME, d.model_dump_json(), readonly=True)
-        if bot is not None:
+        if bot is not None and bot["attributes"].get("status") != "dead":
             self._mark_dead(bot)
         return key
 

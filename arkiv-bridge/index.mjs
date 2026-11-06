@@ -48,7 +48,14 @@ async function createEntity({ schema, attributes, expiresInSeconds, body, readon
 async function patchEntity({ schema, key, attributes, body, extendSeconds }) {
   const set = valuesOf(attributes, body);
   const patch = await writer.patchEntity(makeSchema(schema, attributes), key, { set });
-  if (extendSeconds) await writer.extendEntity({ entityKey: key, expiration: ExpirationTime.fromSeconds(extendSeconds) });
+  if (extendSeconds) {
+    try {
+      await writer.extendEntity({ entityKey: key, expiration: ExpirationTime.fromSeconds(extendSeconds) });
+    } catch (err) {
+      // Rebuilt dead bots already have a 180-day expiry; Arkiv rejects extending to a slightly shorter block.
+      if (!String(err.shortMessage ?? err.message).includes("shorten its life")) throw err;
+    }
+  }
   return { key, txHash: patch.txHash };
 }
 

@@ -44,3 +44,17 @@ def test_struct_to_dict_names_and_enums():
 def test_to_bytes32():
     assert vault.to_bytes32("0x" + "ab" * 32) == bytes.fromhex("ab" * 32)
     assert len(vault.to_bytes32("momentum")) == 32
+
+
+def test_read_reconnects_once_on_dropped_connection():
+    calls = []
+
+    class Call:
+        def call(self):
+            calls.append(1)
+            if len(calls) == 1:
+                raise ConnectionResetError(54, "Connection reset by peer")
+            return 42
+
+    assert vault._read(Call) == 42
+    assert len(calls) == 2

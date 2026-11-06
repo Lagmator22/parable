@@ -206,3 +206,14 @@ def test_report_by_brain_groups_everything_from_two_queries(setup):
     assert sum(1 for path, _ in bridge.calls if path == "/query") - before == 2
     assert rows["rule"]["launched"] == 1 and rows["rule"]["alive"] == 1
     assert rows["gemini:x"]["dead"] == 1 and rows["gemini:x"]["profitable"] == 1
+
+
+def test_rebuilt_dead_bot_is_saved_as_dead_without_re_patching(setup):
+    """Regression: repair rebuilt a dead bot as 'alive' with 180d+1h TTL, then put_death tried to patch it to 180d."""
+    bridge, store = setup
+    dead_rec = make_bot(1).model_copy(update={"status": "dead"})
+    store.put_bot(dead_rec, A.DEATH_LIFETIME)
+    assert bridge.rows[0]["attributes"]["status"] == "dead"
+    assert bridge.rows[0]["expiresInSeconds"] == A.DEATH_LIFETIME
+    store.put_death(make_death(1))
+    assert not any(path == "/patch" for path, _ in bridge.calls)

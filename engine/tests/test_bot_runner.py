@@ -344,3 +344,21 @@ def test_action_given_as_an_object_is_rejected_not_guessed(configured, monkeypat
     bad = '{"action": {"type": "buy"}, "amount_dollars": 20, "reason": "x"}'
     monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp(bad))
     assert B.decide(STATE, "gemini:gem-a").reason.startswith(B.FALLBACK_TAG)
+
+
+def test_flat_oracle_price_adds_signal_ticks_so_momentum_and_dip_buyer_trade(monkeypatch):
+    """Sepolia Chainlink updates ~hourly; signal_price adds small ticks when the oracle is flat, while state['price'] stays the oracle price."""
+    bot = {"status": "alive", "expiresAt": 2**40, "cashUsd": 50_000_000, "ethWei": 0,
+           "maxTradeUsd": 10_000_000, "maxLossBps": 500}
+    monkeypatch.setattr(B.vault, "get_bot", lambda i: bot)
+    monkeypatch.setattr(B.vault, "price", lambda: PRICE)
+    monkeypatch.setattr(B.vault, "equity", lambda i: 50_000_000)
+    history = []
+    for _ in range(3):
+        state, _ = B.read_state(1, RULES, history)
+    assert state["price"] == PRICE  # the vault still trades at the real Chainlink price
+    assert len(set(history)) == 3  # signal history moves so rules don't sit on HOLD
+    assert B.rule_decide(state).action == "buy"
+    assert B.rule_decide({**state, "strategy": "dip_buyer"}).action == "buy"
+    # When the real Chainlink price moves, signal_price uses it directly.
+    assert B.signal_price(PRICE + 50 * 10**8, history) == PRICE + 50 * 10**8

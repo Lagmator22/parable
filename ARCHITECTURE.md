@@ -183,7 +183,7 @@
 | 6 | If the server restarts, running bots lose their keys (kept in memory only, on purpose) and simply expire | 🟡 Small | Document; short leases for demo |
 | 7 | World approvals are kept in memory: a restart forgets pending launches | 🟡 Small | Fine for demo |
 | 8 | Each bot needs 0.003 test ETH for fees, so the operator wallet must hold enough | 🟡 Small | Keep ~0.1 Sepolia ETH in the operator wallet |
-| 9 | Sepolia's Chainlink price updates about once an hour | 🟡 Small | Set MAX_PRICE_AGE to 7200 seconds |
+| 9 | Sepolia's Chainlink price updates about once an hour | ✅ Fixed | MAX_PRICE_AGE = 7200 s; when the oracle is flat between hourly updates, the bot brain gets small signal ticks so `momentum` and `dip_buyer` still trade (the vault always settles at the real Chainlink price) |
 | 10 | "Unregistered bot" demo shows `NotBot`; clearer to also show `NotRegistered` | 🟢 Polish | Add a second cheat button |
 | 11 | MCP (Claude Code / Codex access) and the Opus manager are not started | ⚪ Stretch | Phase 4, only after the core runs for real |
 
@@ -231,4 +231,4 @@ Each bot is launched with one "brain" (the thing that decides buy, sell or hold)
   Clean rows: every row carries the vault's address, so old test rows never show up
 ```
 
-*Status: 134 Python + 39 contract tests pass. Real launch retry pending.*
+*Status: 141 Python + 39 contract tests pass. First 4 real Sepolia bots born and in the Arkiv graveyard (`vault_count_matches: true`).*

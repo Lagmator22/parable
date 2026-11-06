@@ -99,25 +99,35 @@ def fund_gas(bot_address: str, wei: int = BOT_GAS_WEI) -> str:
 
 # ---------------------------------------------------------------- vault reads
 
+def _read(fn):
+    """Call a read-only contract function; if the RPC node dropped an idle connection, reconnect once."""
+    try:
+        return fn().call()
+    except Exception:
+        _w3.cache_clear()
+        _vault.cache_clear()
+        return fn().call()
+
+
 def equity(bot_id: int) -> int:
     """Bot's total value in USD (6 decimals), cash plus ETH at the oracle price."""
-    return _vault().functions.equityUsd(bot_id).call()
+    return _read(lambda: _vault().functions.equityUsd(bot_id))
 
 
 def price() -> int:
     """ETH/USD from Chainlink, 8 decimals (so 3000.00 USD is 300000000000)."""
-    return _vault().functions.priceView().call()
+    return _read(lambda: _vault().functions.priceView())
 
 
 def total_born() -> int:
     """How many bots the vault has ever registered. Bot ids are 1..total_born."""
-    return _vault().functions.totalBorn().call()
+    return _read(lambda: _vault().functions.totalBorn())
 
 
 def counts(creator_id: str) -> tuple[int, int]:
     """(bots born, bots dead) for one creator, straight from the vault."""
     node = to_bytes32(creator_id)
-    return _vault().functions.creatorBorn(node).call(), _vault().functions.creatorDead(node).call()
+    return _read(lambda: _vault().functions.creatorBorn(node)), _read(lambda: _vault().functions.creatorDead(node))
 
 
 def struct_to_dict(raw) -> dict:
@@ -134,7 +144,7 @@ def struct_to_dict(raw) -> dict:
 
 
 def get_bot(bot_id: int) -> dict:
-    return struct_to_dict(_vault().functions.getBot(bot_id).call())
+    return struct_to_dict(_read(lambda: _vault().functions.getBot(bot_id)))
 
 
 # ---------------------------------------------------------------- explaining reverts

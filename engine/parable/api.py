@@ -155,8 +155,15 @@ def confirm(pending_id: str, claim: str = Header("", alias="x-claim")):
 @app.get("/api/bots")
 def list_bots(creator: str | None = None, status: str | None = None):
     lau = get_launcher()
+    records = {r.bot_id: r for r in lau.b.arkiv.bots(creator or None, status or None)}
+    # Include bots just born on-chain whose background Arkiv write is still in flight.
+    for b in list(lau.live.values()):
+        st = "dead" if b.dead else "alive"
+        if b.record.bot_id not in records and (not creator or b.record.creator_id.lower() == creator.lower()):
+            if not status or status == st:
+                records[b.record.bot_id] = b.record.model_copy(update={"status": st})
     out = []
-    for rec in lau.b.arkiv.bots(creator or None, status or None):
+    for rec in records.values():
         try:
             equity = lau.b.vault.equity(rec.bot_id)
         except Exception:
@@ -265,5 +272,13 @@ def classic():
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
-if (FRONTEND / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="assets")
+
+
+@app.get("/assets/{name:path}")
+def frontend_asset(name: str):
+    """Serve built Vite assets even when `frontend/dist` was built after the server started."""
+    root = (FRONTEND / "assets").resolve()
+    target = (root / name).resolve()
+    if not target.is_relative_to(root) or not target.is_file():
+        raise HTTPException(404, "asset not found")
+    return FileResponse(target)

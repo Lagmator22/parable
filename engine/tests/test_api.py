@@ -160,3 +160,28 @@ def test_arkiv_outage_gives_short_json_not_a_crash_page(client):
     r = c2.get("/api/report/brains")
     assert r.status_code == 503 and "8787" not in r.text  # no internal addresses leak
     assert r.json()["detail"].startswith("the public record")
+
+
+def test_slow_arkiv_write_does_not_block_confirm_and_live_bot_is_listed(client):
+    c, world, lau = client
+    real_put = lau.b.arkiv.put_bot
+
+    def slow_put(rec, lease):
+        time.sleep(0.25)
+        return real_put(rec, lease)
+
+    lau.b.arkiv.put_bot = slow_put
+    t0 = time.monotonic()
+    bot = launch(c, world)
+    assert time.monotonic() - t0 < 0.2  # confirm returned without waiting for slow_put
+    # Even before slow_put finishes on Arkiv, /api/bots lists the live bot from memory.
+    assert [b["bot_id"] for b in c.get("/api/bots", params={"status": "alive"}).json()] == [bot["bot_id"]]
+    time.sleep(0.3)
+
+
+def test_report_survives_vault_rpc_disconnect(client):
+    c, world, lau = client
+    bot = launch(c, world)
+    lau.b.vault.counts = lambda _c: (_ for _ in ()).throw(ConnectionResetError("reset"))
+    r = c.get("/api/report", params={"creator": bot["creator_id"]})
+    assert r.status_code == 200 and r.json()["vault_count_matches"] is False
