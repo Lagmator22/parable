@@ -43,11 +43,13 @@ Anyone can sell an AI trading bot with a great track record: launch 20 bots, del
 4. **[Try to cheat](https://parable-demo.centralindia.cloudapp.azure.com/#cheat).** Dry-run an unregistered trade, an over-limit trade or a second-wallet attempt against the vault. The dashboard shows the contract response and a command you can run yourself.
 
 <details>
-<summary>See the launch form and Graveyard</summary>
+<summary>See the launch form, Graveyard and Telemetry</summary>
 
 ![Launch form showing the model, trade cap, loss limit and World ID approval](docs/images/launch.png)
 
 ![Graveyard showing ten stopped bots per page with explorer links](docs/images/graveyard.png)
+
+![Telemetry panel with live bot numbers, charts and every vault event](docs/images/telemetry.png)
 
 </details>
 

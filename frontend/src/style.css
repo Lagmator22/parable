@@ -98,7 +98,8 @@ svg text::selection { fill: #fff; }
 .grave-pages > span { color: var(--grey); }
 .grave-page-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .grave-page-buttons .btn { min-width: 44px; height: 44px; padding: 0 9px; }
-.links { display: flex; gap: 12px; }
+.links { display: flex; flex-wrap: wrap; gap: 12px; }
+.links a, .links > * { overflow-wrap: normal; white-space: nowrap; }
 .deaths .row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .log .row { grid-template-columns: 76px minmax(0, 1fr) auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 28px; font: 13px var(--mono); color: var(--grey); }

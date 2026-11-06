@@ -102,7 +102,7 @@ export function Telemetry({ open, onClose, info, bots, botEvents, series, swarm,
               <span title={b.ens_name}>{b.ens_name.replace('.parable.eth', '')}{swarmIds.has(b.bot_id) && <span className="muted"> · swarm</span>}</span>
               <span>{brainName(b.rules.brain)}</span><span>{usd(b.equity_usd)}</span>
               <span className={trend(marketBps)}>{pct(marketBps)}</span><span>{t}</span><span className={r ? 'refused' : ''}>{r}</span>
-              <span style={{ display: 'flex', gap: 10 }}><OutLink href={address ? `${address}${b.bot_address}` : null}>wallet</OutLink><OutLink href={b.tx_url}>birth</OutLink></span>
+              <span className="links" style={{ gap: 10 }}><OutLink href={address ? `${address}${b.bot_address}` : null}>wallet</OutLink><OutLink href={b.tx_url}>birth</OutLink></span>
             </div>)}
           </div>
           <div className="box rows log">
