@@ -25,3 +25,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: Codex documented the Vercel frontend deployment and backend proxy requirements. The project is not deployed to Vercel yet because the backend has no stable public URL configured. User review pending.
 
 - 2026-11-06: Codex changed the illustrated history and section numbers to circles, aligned the launch panel with the other sections, reduced excess section spacing, separated Arkiv error and empty states, and replaced the empty comparison table with one clear message. Constrained scramble text to its label box so hover glyphs stay inside buttons. Checked the changed sections in Chrome. User review pending.
+
+- 2026-11-06: After user feedback, Codex changed Back to top and the three history-card links from instant jumps to smooth destination scrolling, with an instant fallback for reduced motion. Backend files were left to the separate backend work. User review pending.

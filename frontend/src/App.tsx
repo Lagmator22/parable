@@ -15,6 +15,15 @@ function savedTheme(): Theme {
   catch { return 'dark'; }
 }
 
+function scrollToSection(event: React.MouseEvent<HTMLAnchorElement>, hash: string) {
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const target = document.getElementById(hash.slice(1));
+  if (!target) return;
+  event.preventDefault();
+  if (window.location.hash !== hash) window.history.pushState(null, '', hash);
+  target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -80,9 +89,9 @@ export default function App() {
           event.currentTarget.style.setProperty('--pointer-y', `${event.clientY - bounds.top}px`);
         }}>
           <h2 className="visual-title">A bot's public history</h2>
-          <a className="visual-line" href="#launch" aria-label="Born, go to launch a bot"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div></a>
-          <a className="visual-line" href="#live" aria-label="Traded, go to live bots"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div></a>
-          <a className="visual-line" href="#graveyard" aria-label="Died, go to the graveyard"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></a>
+          <a className="visual-line" href="#launch" onClick={event => scrollToSection(event, '#launch')} aria-label="Born, go to launch a bot"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div></a>
+          <a className="visual-line" href="#live" onClick={event => scrollToSection(event, '#live')} aria-label="Traded, go to live bots"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div></a>
+          <a className="visual-line" href="#graveyard" onClick={event => scrollToSection(event, '#graveyard')} aria-label="Died, go to the graveyard"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></a>
         </div>
       </section>
       <Launch info={dashboard.info} brains={dashboard.brains} onBorn={creator => { dashboard.setCreator(creator); void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
@@ -98,6 +107,6 @@ export default function App() {
       </section>
       <section className="trust-section" id="trust"><h2>Don’t take a bot’s<br/><em>word for it.</em></h2><p>Parable’s vault is the source of truth. It counts every bot and every trade. The public record carries transaction links, so anyone can check the history independently.</p><div className="trust-note"><strong>Built on Sepolia with practice funds.</strong><span>The record shows honesty about results, not proof that a strategy will make money.</span></div></section>
     </main>
-    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top" onClick={event => { event.preventDefault(); window.history.replaceState(null, '', '#top'); window.scrollTo({ top: 0, behavior: 'instant' }); }}/></footer>
+    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top" onClick={event => scrollToSection(event, '#top')}/></footer>
   </div>;
 }
