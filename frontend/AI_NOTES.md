@@ -21,3 +21,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: After user review, Codex removed the two hero buttons and made the sticky header Menu control a larger dark green button. The menu remains the direct path to every section, with normal scrolling available too. User review pending.
 
 - 2026-11-06: Codex replaced native strategy and brain selects with theme-aware keyboard menus, made the three history rows navigate to their matching sections with a subtle pointer highlight, and made Back to top jump immediately. Added a keyboard selection test and checked the controls in Chrome. User review pending.
+
+- 2026-11-06: Codex documented the Vercel frontend deployment and backend proxy requirements. The project is not deployed to Vercel yet because the backend has no stable public URL configured. User review pending.
