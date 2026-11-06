@@ -57,7 +57,7 @@ export default function App() {
       <a className="brand" href="#top">Parable<span>.</span></a>
       <div className="header-actions">
         <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? <Sun size={22}/> : <Moon size={22}/>}</button>
-        <ScrambleButton label={menuOpen ? 'Close' : 'Menu'} onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="page-menu" />
+        <ScrambleButton label="Menu" className="menu-trigger" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="page-menu" />
       </div>
     </header>
     <nav id="page-menu" className={`menu-overlay ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen}>
@@ -72,7 +72,6 @@ export default function App() {
         <div className="hero-copy">
           <h1>Every bot.<br/>Every trade.<br/><span>Every failure.</span></h1>
           <p>Creators can show you their winners. Parable shows you the whole record, including the bots that died.</p>
-          <div className="hero-actions"><ScrambleLink label="Launch a bot" href="#launch" arrow className="main-action"/><ScrambleLink label="See how it works" href="#how"/></div>
         </div>
         <div className="hero-visual" aria-label="Illustration of a bot's public history">
           <h2 className="visual-title">A bot's public history</h2>

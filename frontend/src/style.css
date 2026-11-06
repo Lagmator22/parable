@@ -20,18 +20,15 @@
 :root[data-theme=light]{--outline:#557363}
 .hero-visual,.feature-grid article{border:2px solid var(--outline)}
 .theme-toggle,.close-menu{border:2px solid var(--outline)}
-.header-actions .scramble,.hero-actions .scramble,footer .scramble{
+.header-actions .scramble,footer .scramble{
   border:2px solid var(--outline);border-radius:6px;padding:16px 20px;
 }
-.hero-actions .main-action{border-color:var(--button)}
-.hero-actions .main-action:hover{border-color:var(--accent)}
 .menu-links .scramble{border-bottom:2px solid currentColor;padding:8px 0;width:fit-content}
 .visual-title{font-size:clamp(23px,2vw,30px);font-weight:750;letter-spacing:-.04em;margin:0;padding-bottom:25px;border-bottom:1px solid var(--line)}
 .visual-line>span,.feature-grid article>span{font-size:18px}
 .section-heading h2,.trust-section h2{margin-top:0}
 @media(max-width:700px){
   .header-actions .scramble{padding:12px 14px}
-  .hero-actions .scramble{padding:16px}
 }
 
 /* The live application uses the landing page's palette, borders, and type scale. */
@@ -76,6 +73,9 @@
 .menu-overlay{overflow-y:auto}.menu-links{gap:clamp(10px,2vh,25px);padding:28px 0;justify-content:flex-start}.menu-links .scramble{font-size:clamp(30px,4.2vw,58px)}
 .site-header{position:sticky;top:0;z-index:10;background:var(--bg)}
 .app-section,.content-section,.trust-section{scroll-margin-top:82px}
+.header-actions .menu-trigger{min-width:136px;min-height:64px;justify-content:center;padding:16px 24px;background:#294c40;color:#f7f2e8;border:2px solid #507d6b;border-radius:7px;font-size:20px;font-weight:800;transition:background .2s,border-color .2s,color .2s}
+.header-actions .menu-trigger:hover,.header-actions .menu-trigger:focus-visible{background:#3b6a57;color:#fff;border-color:#a8d8c5}
+@media(max-width:700px){.header-actions .menu-trigger{min-width:104px;min-height:52px;padding:12px 18px;font-size:18px}.header-actions{gap:12px}}
 @media(max-width:760px){.app-section{padding-top:68px;padding-bottom:68px}.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-number{width:50px;height:50px;font-size:20px}.timeline-row{grid-template-columns:1fr 1fr}.timeline-row span:last-child{grid-column:1/-1}.report-head{flex-direction:column}}
 @media(max-width:520px){.form-grid{grid-template-columns:1fr}.app-heading h2{font-size:48px}.section-number{display:none}.app-panel{padding:22px}.bot-top{flex-direction:column}.stat-row>div{min-width:calc(50% - 22px)}.menu-links .scramble{font-size:34px}}
 

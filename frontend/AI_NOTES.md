@@ -17,3 +17,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: Codex revised the public-history card after user feedback. The three steps now share one row layout, larger numbered tiles, consistent title and description sizes, and tighter spacing in desktop and phone layouts. User review pending.
 
 - 2026-11-06: Codex integrated the Python engine's documented API into the existing React design. The page now has World approval launch, live bots and vault actions, Arkiv graveyard and report card, brain comparison, and vault attack checks. Added safe API errors, contract unit formatting, browser token storage, timed polling, and tests. The backend and its `/classic` fallback were not changed. User review pending.
+
+- 2026-11-06: After user review, Codex removed the two hero buttons and made the sticky header Menu control a larger dark green button. The menu remains the direct path to every section, with normal scrolling available too. User review pending.
