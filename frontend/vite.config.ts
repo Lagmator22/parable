@@ -5,5 +5,10 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: { '/api': process.env.PARABLE_API || 'http://127.0.0.1:8000', '/world': process.env.PARABLE_API || 'http://127.0.0.1:8000' } },
+  server: { proxy: {
+    '/api': process.env.PARABLE_API || 'http://127.0.0.1:8000',
+    '/world': process.env.PARABLE_API || 'http://127.0.0.1:8000',
+    '/classic': process.env.PARABLE_API || 'http://127.0.0.1:8000',
+    '/static': process.env.PARABLE_API || 'http://127.0.0.1:8000',
+  } },
 });
