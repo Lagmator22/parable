@@ -53,7 +53,10 @@ export function Launch({ info, brains, onBorn }: Props) {
     return n.values.map(x => ({ value: x, label: n.show(x), note: n.note(x) }));
   };
   const label = (f: Field) => f === 'strategy' ? String(v.strategy).replace('_', ' ') : f === 'brain' ? brainName(v.brain) : NUMBERS[f].show(v[f]);
-  const word = (f: Field) => <button type="button" className="word" aria-expanded={open === f} onClick={() => setOpen(open === f ? null : f)}>{label(f)}</button>;
+  // While a launch is in progress the sentence is locked: those settings were already sent to the vault.
+  const locked = phase === 'waiting' || phase === 'creating';
+  const word = (f: Field) => <button type="button" className="word" disabled={locked} aria-expanded={open === f}
+    onClick={() => setOpen(open === f ? null : f)}>{label(f)}</button>;
   const tooBig = v.trade > v.cash;
   const busy = phase === 'waiting' || phase === 'creating';
 
@@ -82,7 +85,7 @@ export function Launch({ info, brains, onBorn }: Props) {
           if (err.message.startsWith('approved:')) {
             tab?.close(); setPhase('creating');
             setDone(Number(/step (\d)\/6/.exec(err.message)?.[1] ?? 1));
-            setMessage('Approved. Setting the bot up on Sepolia'); setApprovalUrl('');
+            setMessage('Approved. Setting the bot up on Sepolia (real transactions, so it can’t be undone; you can stop the bot once it’s born)'); setApprovalUrl('');
           } else setMessage('Waiting for you to approve in the World ID tab');
           await pause(2_000);
         }
