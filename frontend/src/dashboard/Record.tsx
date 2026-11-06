@@ -1,37 +1,55 @@
 // Section 03, the register: every bot ever launched, dead ones included, read from Arkiv. A dead bot's name
 // is struck through; orange only when the vault ended it for losing. Also the brain comparison table.
-import { useEffect, useState } from 'react';
-import { OutLink } from '../components/ui/Button';
+import { Fragment, useMemo, useState } from 'react';
+import { Button, OutLink } from '../components/ui/Button';
 import { Section } from '../components/ui/Section';
-import { brainName, causeName, pct, request, trend, type BrainReport, type Grave, type Report } from './api';
+import { brainName, causeName, pct, trend, type BrainReport, type Grave, type Report } from './api';
 
-type Props = { report: Report | null; recordError: string };
+type Props = { graves: Grave[]; report: Report | null; recordError: string };
+const PAGE_SIZE = 10;
 const lived = (s: number) => s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : `${(s / 3600).toFixed(1)} h`;
 
-export function Register({ report, recordError }: Props) {
-  // The register is public: every bot anyone ever launched on this vault, dead ones included.
-  const [rows, setRows] = useState<Grave[]>([]);
-  const [error, setError] = useState('');
-  useEffect(() => {
-    let on = true;
-    const load = () => { if (!document.hidden) request<Grave[]>('/api/graveyard/all').then(v => { if (on) { setRows([...v].sort((a, b) => b.bot_id - a.bot_id)); setError(''); } })
-      .catch(e => { if (on) setError(e instanceof Error ? e.message : 'Could not load.'); }); };
-    load();
-    const t = window.setInterval(load, 10_000);
-    return () => { on = false; window.clearInterval(t); };
-  }, []);
-  const problem = error || recordError;
+function GraveyardPages({ page, total, onPage }: { page: number; total: number; onPage: (page: number) => void }) {
+  const lastPage = Math.ceil(total / PAGE_SIZE);
+  const first = Math.max(2, Math.min(page - 1, lastPage - 3));
+  const last = Math.min(lastPage - 1, first + 2);
+  const pages = [1];
+  for (let number = first; number <= last; number++) pages.push(number);
+  pages.push(lastPage);
+
+  return <nav className="grave-pages" aria-label="Graveyard pages">
+    <span role="status">Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} bots</span>
+    <div className="grave-page-buttons">
+      <Button type="button" disabled={page === 1} onClick={() => onPage(page - 1)}>Previous</Button>
+      {pages.map((number, index) => <Fragment key={number}>
+        {index > 0 && number > pages[index - 1] + 1 && <span aria-hidden="true">…</span>}
+        <Button type="button" variant={number === page ? 'solid' : 'line'}
+          aria-label={`Page ${number}`} aria-current={number === page ? 'page' : undefined}
+          onClick={() => onPage(number)}>{number}</Button>
+      </Fragment>)}
+      <Button type="button" disabled={page === lastPage} onClick={() => onPage(page + 1)}>Next</Button>
+    </div>
+  </nav>;
+}
+
+export function Register({ graves, report, recordError }: Props) {
+  const [selectedPage, setPage] = useState(1);
+  const rows = useMemo(() => [...graves].sort((a, b) => b.bot_id - a.bot_id), [graves]);
+  const page = Math.min(selectedPage, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
+  if (selectedPage !== page) setPage(page);
+  const visibleRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return <Section id="register" label="03 Register">
     <h2>The graveyard</h2>
     <p className="lead">Every bot that ever stopped on this vault, and how. Nobody can remove a row: the vault writes them, not the bots, and each one links to its read-only record on Arkiv. {report && (report.vault_count_matches
       ? `The vault counts ${report.launched} bots and so does this list, so none are missing.`
       : 'This list and the vault’s count differ right now; it usually catches up within a minute.')}</p>
-    {problem && <div className="box empty">{problem}</div>}
+    {recordError && <div className="box empty">{recordError}</div>}
     <div className="box rows register">
+      {rows.length > PAGE_SIZE && <GraveyardPages page={page} total={rows.length} onPage={setPage}/>}
       <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Trades</span><span>Lived</span><span>Return</span><span>How it ended</span><span>Check it</span></div>
-      {rows.length === 0 ? <div className="empty">{problem ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
-        : rows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
+      {rows.length === 0 ? <div className="empty">{recordError ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
+        : visibleRows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
           <span>{g.bot_id}</span><span><span className="struck">{g.ens_name}</span>{g.approval === 'demo' && <span className="muted" title="Approved without World ID (demo approval)"> · demo</span>}</span><span>{brainName(g.brain)}</span><span>{g.trades ?? '—'}</span>
           <span>{lived(g.lifetime_s)}</span><span className={trend(g.pnl_bps)}>{pct(g.pnl_bps)}</span>
           <span>{causeName(g.cause)}</span>
