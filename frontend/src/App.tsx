@@ -30,10 +30,8 @@ export default function App() {
     const root = document.documentElement;
     const x = event.clientX;
     const y = event.clientY;
-    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    root.style.setProperty('--reveal-x', `${x}px`);
-    root.style.setProperty('--reveal-y', `${y}px`);
-    root.style.setProperty('--reveal-radius', `${radius}px`);
+    root.style.setProperty('--ripple-x', `${x}px`);
+    root.style.setProperty('--ripple-y', `${y}px`);
     const transition = document.startViewTransition(() => {
       root.dataset.theme = next;
       flushSync(() => setTheme(next));
