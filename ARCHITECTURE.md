@@ -175,9 +175,9 @@
 ## 8. Holes we know about, and how we'll fix them (improvement pipeline)
 | # | Hole (plain words) | How bad | Fix / plan |
 |---|---|---|---|
-| 1 | **Nothing has run on a real blockchain yet.** All tests use pretend versions | 🔴 Big | Needs your keys + test money, then run the 3 spike scripts and deploy the vault |
-| 2 | Contract tests never actually ran (Foundry not installed) | 🔴 Big | Install Foundry, run `forge test` |
-| 3 | Writing to Arkiv and creating ENS names is untested for real | 🟠 Medium | Fund the Arkiv wallet + register an ENS name, run spikes |
+| 1 | ~~Nothing has run on a real blockchain yet~~ Vault deployed, ENS + Arkiv + World each proven live | ✅ Done | See DEPLOYMENTS.md |
+| 2 | ~~Contract tests never ran~~ | ✅ Done | 39 Foundry tests pass |
+| 3 | First real launch failed: two helpers used the same transaction number; dashboard overloaded Arkiv | ✅ Fixed | Section 10 below: post office, cache, outbox, repair |
 | 4 | Parable's server is trusted to say "this creator passed World ID" when it registers a bot | 🟡 Known limit | Say it honestly in README; stretch: check World proof on-chain |
 | 5 | The vault's "best score so far" only updates when the bot trades | 🟡 Small | Fine for demo; note in README |
 | 6 | If the server restarts, running bots lose their keys (kept in memory only, on purpose) and simply expire | 🟡 Small | Document; short leases for demo |
@@ -209,4 +209,26 @@ Each bot is launched with one "brain" (the thing that decides buy, sell or hold)
   Dashboard "Compare brains" table: launched / dead / profitable / worst loss / average, per brain
 ```
 
-*Phase 2 status: 69 automated tests pass; full flow works in offline simulation; real-chain run waits for keys.*
+## 10. After the first real launch: three safety nets
+```
+  1. THE POST OFFICE (tx_sender.py)
+     vault helper ─┐                       one queue per wallet; remembers the last ticket number,
+     ENS helper   ─┼──▶  📮 post office ──▶ so two letters never get the same number
+     gas top-ups  ─┘                       (a clash = "replacement transaction underpriced")
+
+  2. THE OUTBOX (repair.py)
+     vault says "bot born" ✅ ──▶ write to Arkiv ── fails? ──▶ 📥 outbox ──▶ retried every 5 s
+     (the launch still succeeds: the vault already has the bot, the notebook catches up)
+
+  3. THE REPAIR WALK (repair.py, once a minute)
+     for every bot id the vault ever made (1, 2, 3 ...):
+        no notebook record?      ──▶ rebuild it from the vault's own data
+        lease over, still alive? ──▶ expire it (anyone may)
+        dead but no grave?       ──▶ write the grave
+     ⇒ even a crash can't leave a hidden bot. The vault is the boss; Arkiv copies it.
+
+  Less load on Arkiv: answers cached 8 s · brain table = 1 call (was 12) · page pauses when hidden
+  Clean rows: every row carries the vault's address, so old test rows never show up
+```
+
+*Status: 134 Python + 39 contract tests pass. Real launch retry pending.*

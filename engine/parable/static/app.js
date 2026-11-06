@@ -1,4 +1,4 @@
-// Dashboard logic: talks to /api/* and redraws every 3 seconds. Plain JavaScript, no framework.
+// Dashboard logic: talks to /api/* and redraws every 5 seconds (brain table every 15). Plain JavaScript, no framework.
 let brains = [];  // every brain name, filled in at start
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n == null ? "?" : "$" + (n / 1e6).toFixed(2));
@@ -9,9 +9,14 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 
 // Secret codes travel in headers (never in the web address, which can end up in logs).
 async function api(path, method = "GET", headers = {}) {
-  const res = await fetch(path, { method, headers });
-  const body = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, body };
+  try {
+    const res = await fetch(path, { method, headers });
+    // A crash or the tunnel can answer with HTML: show a short message, never the raw page.
+    const body = await res.json().catch(() => ({ detail: `server error (${res.status})` }));
+    return { ok: res.ok, status: res.status, body };
+  } catch {
+    return { ok: false, status: 0, body: { detail: "server not reachable" } };
+  }
 }
 
 function creator() {
@@ -43,25 +48,25 @@ function reportHtml(r) {
     worst loss <b class="bad">${pct(r.worst_pnl_bps)}</b><br>${match}`;
 }
 
-// One row per brain, using the same report card the API gives for a creator.
+// One row per brain, all from a single call (the public record is rate-limited, so ask once).
 async function compareBrains() {
-  const rows = [];
-  for (const b of brains) {
-    const r = (await api("/api/report?brain=" + b)).body;
-    rows.push(`<tr><td>${b}</td><td>${r.launched}</td><td>${r.dead}</td><td>${r.profitable}</td>
-      <td class="bad">${pct(r.worst_pnl_bps)}</td><td>${pct(r.avg_pnl_bps)}</td></tr>`);
-  }
+  const r = await api("/api/report/brains");
+  if (!r.ok) return;
+  const rows = r.body.filter((b) => b.available || b.launched).map((b) => `<tr><td>${esc(b.brain)}</td><td>${b.launched}</td>
+      <td>${b.dead}</td><td>${b.profitable}</td><td class="bad">${pct(b.worst_pnl_bps)}</td><td>${pct(b.avg_pnl_bps)}</td></tr>`);
   $("compare").innerHTML = "<tr><th>brain</th><th>launched</th><th>dead</th><th>profitable</th><th>worst loss</th><th>avg PnL</th></tr>" + rows.join("");
 }
 
 async function refresh() {
-  compareBrains();
+  if (document.hidden) return;  // don't load the server while nobody is looking
   const me = creator();
   const q = me ? `?creator=${encodeURIComponent(me)}` : "";
   const live = await api("/api/bots" + q + (q ? "&" : "?") + "status=alive");
+  if (!live.ok) return;
   $("live").innerHTML = (live.body.length ? live.body.map(liveCard).join("") : '<span class="muted">No live bots.</span>');
   if (!me) return;
   const grave = await api("/api/graveyard/" + encodeURIComponent(me));
+  if (!grave.ok) return;
   $("graveyard").innerHTML = grave.body.length ? grave.body.map(tombstone).join("") : '<span class="muted">Empty. No bot has died yet.</span>';
   const rep = await api("/api/report" + q);
   if (rep.ok) $("report").innerHTML = reportHtml(rep.body);
@@ -84,13 +89,19 @@ async function launch() {
   const rules = { brain: $("brain").value, strategy: $("strategy").value, start_cash_usd: num("cash") * 1e6, max_trade_usd: num("maxtrade") * 1e6,
                   max_loss_bps: num("maxloss") * 100, lease_seconds: num("lease") * 60 };
   const res = await fetch("/api/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rules) });
-  if (!res.ok) { $("launch-msg").textContent = "No bot launched: " + (await res.json()).detail; return; }
-  const { pending_id, claim, approve_url } = await res.json();
+  const started = await res.json().catch(() => ({ detail: `server error (${res.status})` }));
+  if (!res.ok) { $("launch-msg").textContent = "No bot launched: " + started.detail; return; }
+  const { pending_id, claim, approve_url } = started;
   window.open(approve_url, "_blank");  // the World ID approval page
-  $("launch-msg").textContent = "Waiting for World ID approval in the new tab...";
+  $("launch-msg").textContent = "Waiting for World ID approval in the new tab... (after approval the bot takes about a minute to be born on-chain)";
+  let busy = false;  // never send a second "is it born yet?" while the first is still being answered
   const timer = setInterval(async () => {
+    if (busy) return;
+    busy = true;
     const r = await api(`/api/launch/${pending_id}/confirm`, "POST", { "x-claim": claim });
-    if (r.status === 409) return;  // still waiting
+    busy = false;
+    if (r.status === 409) { $("launch-msg").textContent = r.body.detail; return; }  // waiting / being born
+    if (r.status === 0) return;  // network blip: keep trying
     clearInterval(timer);
     if (r.ok) {
       $("creator").value = r.body.bot.creator_id;
@@ -128,7 +139,11 @@ async function start() {
     const live = (await api("/api/bots?status=alive")).body;
     live.length ? cheat(`/api/cheat/over-limit/${live[0].bot_id}`) : ($("cheat-out").textContent = "Launch a bot first.");
   };
+  const strategies = info.strategies || ["momentum"];
+  $("strategy").innerHTML = strategies.map((s) => `<option>${esc(s)}</option>`).join("");
   refresh();
-  setInterval(refresh, 3000);
+  compareBrains();
+  setInterval(refresh, 5000);
+  setInterval(() => document.hidden || compareBrains(), 15000);
 }
 start();

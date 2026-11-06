@@ -4,10 +4,16 @@ Arkiv is a public on-chain database. We talk to it through arkiv-bridge/, a smal
 service that uses the official @arkiv-network/sdk (the Python SDK cannot talk to the Rabdi testnet).
 SECURITY: anyone can write fake rows to Arkiv, so every query is limited to rows owned by OUR writer
 wallet, and if we do not know that wallet we refuse to read at all (fail closed).
+Every row also carries the vault's address ("vault" attribute), so test rows and rows from an old vault
+never mix into the real graveyard. Reads are cached for a few seconds because the public endpoint is rate-limited.
 """
 
 from __future__ import annotations
 
+import json
+import threading
+import time
+from collections import defaultdict
 
 import httpx
 
@@ -19,6 +25,8 @@ BOT, EVENT, DEATH = "parable.bot", "parable.event", "parable.death"
 DAY = 86400
 EVENT_LIFETIME = 30 * DAY
 DEATH_LIFETIME = 180 * DAY  # about the longest an Arkiv entity may live (182.5 days)
+READ_CACHE_S = 8  # the dashboard asks often; Arkiv's public endpoint allows few requests per second
+READ_TIMEOUT_S, WRITE_TIMEOUT_S = 20, 60
 
 
 class ArkivError(RuntimeError):
@@ -34,7 +42,8 @@ class Bridge:
 
     def call(self, method: str, path: str, payload: dict | None = None):
         try:
-            r = httpx.request(method, self.url + path, json=payload, timeout=60,
+            timeout = READ_TIMEOUT_S if path in ("/query", "/health") else WRITE_TIMEOUT_S
+            r = httpx.request(method, self.url + path, json=payload, timeout=timeout,
                               headers={"x-bridge-token": self.token})
         except httpx.HTTPError as err:
             raise ArkivError(f"arkiv-bridge not reachable at {self.url} (cd arkiv-bridge && npm start): {err}") from err
@@ -57,10 +66,16 @@ def _creator(creator_id: str) -> str:
 
 
 class ArkivStore:
-    def __init__(self, bridge: Bridge, writer: str = ""):
+    def __init__(self, bridge: Bridge, writer: str = "", vault: str = ""):
         self.bridge = bridge
         self._writer = writer
+        self.vault = vault.lower()  # empty = no vault filter (unit tests)
         self.last_tx = ""
+        self._cache: dict[str, tuple[float, list]] = {}
+        self._cache_lock = threading.Lock()
+
+    def _scoped(self, attrs: dict) -> dict:
+        return {**attrs, "vault": _s(self.vault)} if self.vault else attrs
 
     def writer(self) -> str:
         """The one wallet whose rows we trust. Raises if we cannot find out which it is."""
@@ -72,13 +87,28 @@ class ArkivStore:
 
     def _query(self, schema: str, **where: list) -> list[dict]:
         owner = self.writer()  # always filter by owner: never read other people's rows
-        filters = {k: v for k, v in where.items() if v is not None}
-        return self.bridge.call("POST", "/query", {"schema": schema, "where": filters, "owner": owner})
+        filters = self._scoped({k: v for k, v in where.items() if v is not None})
+        payload = {"schema": schema, "where": filters, "owner": owner}
+        cache_key = json.dumps(payload, sort_keys=True)
+        with self._cache_lock:
+            hit = self._cache.get(cache_key)
+        if hit and time.monotonic() - hit[0] < READ_CACHE_S:
+            return hit[1]
+        rows = self.bridge.call("POST", "/query", payload)
+        with self._cache_lock:
+            self._cache[cache_key] = (time.monotonic(), rows)
+        return rows
+
+    def _forget_reads(self) -> None:
+        with self._cache_lock:
+            self._cache.clear()
 
     def _create(self, schema: str, attrs: dict, seconds: int, body: str, readonly: bool = False) -> str:
         out = self.bridge.call("POST", "/entities", {
-            "schema": schema, "attributes": attrs, "expiresInSeconds": seconds, "body": body, "readonly": readonly,
+            "schema": schema, "attributes": self._scoped(attrs), "expiresInSeconds": seconds, "body": body,
+            "readonly": readonly,
         })
+        self._forget_reads()  # a write makes cached reads stale
         self.last_tx = out["txHash"]
         return out["key"]
 
@@ -92,7 +122,8 @@ class ArkivStore:
             "strategy": _s(rec.strategy), "brain": _s(rec.rules.brain), "status": _s("alive"), "born_at": _n("u64", rec.born_at),
             "vault_tx": _s(rec.born_tx.lower()),
         }
-        return self._create(BOT, attrs, lease_seconds, rec.model_dump_json())
+        # +1 hour of grace, so the row is still there when the death is written (or repaired) after the lease
+        return self._create(BOT, attrs, lease_seconds + 3600, rec.model_dump_json())
 
     def put_event(self, ev: BotEvent) -> str:
         attrs = {"bot_id": _n("u256", ev.bot_id), "kind": _s(ev.kind), "at": _n("u64", ev.at)}
@@ -130,6 +161,7 @@ class ArkivStore:
             "schema": BOT, "key": bot_row["key"], "attributes": {"status": _s("dead")},
             "body": rec.model_dump_json(), "extendSeconds": DEATH_LIFETIME,
         })
+        self._forget_reads()
 
     # -- reads
 
@@ -154,6 +186,23 @@ class ArkivStore:
     def graveyard(self, creator_id: str) -> list[DeathRecord]:
         return sorted(self._deaths(creator_id=creator_id), key=lambda d: d.bot_id)
 
+    def events(self, bot_id: int) -> list[BotEvent]:
+        """One bot's timeline (birth, trades, blocked trades, death), newest first."""
+        rows = self._query(EVENT, bot_id=_n("u256", bot_id))
+        return sorted((BotEvent.model_validate_json(r["body"]) for r in rows), key=lambda e: e.at, reverse=True)
+
+    def report_by_brain(self) -> dict[str, dict]:
+        """Report-card numbers for every brain from just TWO queries (all bots, all deaths), grouped here."""
+        bots = [BotRecord.model_validate_json(r["body"]) for r in self._query(BOT)]
+        deaths = self._deaths()
+        brain_of = {b.bot_id: b.rules.brain for b in bots}
+        groups: dict[str, dict] = defaultdict(lambda: {"bots": [], "deaths": []})
+        for b in bots:
+            groups[b.rules.brain]["bots"].append(b)
+        for d in deaths:
+            groups[brain_of.get(d.bot_id, "unknown")]["deaths"].append(d)
+        return {brain: _card_numbers(g["bots"], g["deaths"]) for brain, g in groups.items()}
+
     def report_card(
         self, creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None,
         brain: str | None = None,
@@ -169,19 +218,26 @@ class ArkivStore:
         bots = [BotRecord.model_validate_json(r["body"]) for r in bot_rows]
         deaths = self._deaths(creator_id=c, strategy=strategy, brain=brain)
 
-        dead_ids = {d.bot_id for d in deaths} | {b.bot_id for b in bots if b.status == "dead"}
-        all_ids = {b.bot_id for b in bots} | dead_ids
-        pnls = [d.pnl_bps for d in deaths]
+        nums = _card_numbers(bots, deaths)
         return ReportCard(
             subject=creator_id or (f"strategy:{strategy}" if strategy else f"brain:{brain}" if brain else "all"),
-            launched=len(all_ids),
-            alive=len({b.bot_id for b in bots if b.status == "alive"} - dead_ids),
-            dead=len(dead_ids),
-            profitable=sum(1 for p in pnls if p > 0),
-            worst_pnl_bps=min(pnls, default=0),
-            avg_pnl_bps=sum(pnls) / len(pnls) if pnls else 0.0,
-            vault_count_matches=vault_count is not None and vault_count == len(all_ids),
+            **nums, vault_count_matches=vault_count is not None and vault_count == nums["launched"],
         )
+
+
+def _card_numbers(bots: list[BotRecord], deaths: list[DeathRecord]) -> dict:
+    """Counted from ALL bot and death rows, graveyard included (a bot counts once even if it has both)."""
+    dead_ids = {d.bot_id for d in deaths} | {b.bot_id for b in bots if b.status == "dead"}
+    all_ids = {b.bot_id for b in bots} | dead_ids
+    pnls = [d.pnl_bps for d in deaths]
+    return {
+        "launched": len(all_ids),
+        "alive": len({b.bot_id for b in bots if b.status == "alive"} - dead_ids),
+        "dead": len(dead_ids),
+        "profitable": sum(1 for p in pnls if p > 0),
+        "worst_pnl_bps": min(pnls, default=0),
+        "avg_pnl_bps": sum(pnls) / len(pnls) if pnls else 0.0,
+    }
 
 
 # ---- module-level functions (INTERFACES.md)
@@ -193,7 +249,7 @@ def default_store() -> ArkivStore:
     global _store
     if _store is None:
         s = get_settings()
-        _store = ArkivStore(Bridge(s.arkiv_bridge_url), writer=s.arkiv_writer_address)
+        _store = ArkivStore(Bridge(s.arkiv_bridge_url), writer=s.arkiv_writer_address, vault=s.vault_address)
     return _store
 
 
@@ -220,3 +276,11 @@ def bots(creator_id: str | None = None, status: str | None = None) -> list[BotRe
 def report_card(creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None,
                 brain: str | None = None) -> ReportCard:
     return default_store().report_card(creator_id, strategy, vault_count, brain)
+
+
+def events(bot_id: int) -> list[BotEvent]:
+    return default_store().events(bot_id)
+
+
+def report_by_brain() -> dict[str, dict]:
+    return default_store().report_by_brain()

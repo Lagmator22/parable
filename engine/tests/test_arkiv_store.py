@@ -69,7 +69,7 @@ def setup():
 def test_put_bot_expires_with_lease_and_reads_back(setup):
     bridge, store = setup
     store.put_bot(make_bot(), 900)
-    assert bridge.rows[0]["expiresInSeconds"] == 900
+    assert bridge.rows[0]["expiresInSeconds"] == 900 + 3600  # lease + 1 h grace for the death write
     assert bridge.rows[0]["attributes"]["creator_id"] == CREATOR.lower()
     assert store.bots(creator_id=CREATOR)[0].bot_id == 1
     assert store.bots(status="dead") == []
@@ -165,3 +165,44 @@ def test_bridge_token_comes_from_settings_not_shell(monkeypatch):
     monkeypatch.delenv("ARKIV_BRIDGE_TOKEN", raising=False)
     monkeypatch.setattr(A, "get_settings", lambda: type("S", (), {"arkiv_bridge_token": "from-dotenv-123456"})())
     assert A.Bridge("http://127.0.0.1:1").token == "from-dotenv-123456"
+
+
+def test_reads_are_cached_and_a_write_clears_the_cache(setup):
+    bridge, store = setup
+    store.bots()
+    store.bots()
+    assert sum(1 for path, _ in bridge.calls if path == "/query") == 1  # second read came from the cache
+    store.put_bot(make_bot(2), 900)
+    assert [b.bot_id for b in store.bots()] == [2]  # the write made the cache stale, so we read again
+
+
+def test_vault_scope_hides_rows_from_spikes_and_old_vaults():
+    bridge = FakeBridge()
+    old = A.ArkivStore(bridge)  # rows written without a vault tag (like the spike script did)
+    old.put_bot(make_bot(1), 900)
+    scoped = A.ArkivStore(bridge, vault="0xVAULT")
+    scoped.put_bot(make_bot(2), 900)
+    assert [b.bot_id for b in scoped.bots()] == [2]
+    assert bridge.rows[-1]["attributes"]["vault"] == "0xvault"
+
+
+def test_events_come_back_newest_first(setup):
+    _, store = setup
+    for at in (10, 30, 20):
+        store.put_event(BotEvent(bot_id=1, kind="trade", at=at, tx_hash=None, data={}))
+    store.put_event(BotEvent(bot_id=2, kind="trade", at=99, tx_hash=None, data={}))
+    assert [e.at for e in store.events(1)] == [30, 20, 10]
+
+
+def test_report_by_brain_groups_everything_from_two_queries(setup):
+    bridge, store = setup
+    a = make_bot(1)
+    b = make_bot(2).model_copy(update={"rules": make_bot(2).rules.model_copy(update={"brain": "gemini:x"})})
+    store.put_bot(a, 900)
+    store.put_bot(b, 900)
+    store.put_death(make_death(2, pnl=500))
+    before = sum(1 for path, _ in bridge.calls if path == "/query")
+    rows = store.report_by_brain()
+    assert sum(1 for path, _ in bridge.calls if path == "/query") - before == 2
+    assert rows["rule"]["launched"] == 1 and rows["rule"]["alive"] == 1
+    assert rows["gemini:x"]["dead"] == 1 and rows["gemini:x"]["profitable"] == 1

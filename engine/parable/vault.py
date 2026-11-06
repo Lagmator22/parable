@@ -4,21 +4,18 @@ signed locally with a private key; the vault checks who signed, so keys matter.
 """
 
 import json
-import threading
 from functools import lru_cache
 from pathlib import Path
 
-from eth_account import Account
 from web3 import Web3
 
+from parable import tx_sender
 from parable.config import get_settings
 
 ABI = json.loads((Path(__file__).parent / "abi" / "ParableVault.json").read_text())
 STATUS = ["none", "alive", "dead"]
 CAUSE = ["none", "expired", "killed", "loss_limit"]
 RECEIPT_TIMEOUT_S = 120
-# One lock so two threads never grab the same nonce (transaction counter) for the same key.
-_send_lock = threading.Lock()
 
 
 @lru_cache
@@ -42,25 +39,11 @@ def to_bytes32(value: str) -> bytes:
 # ---------------------------------------------------------------- sending transactions
 
 def _send(fn, private_key: str) -> dict:
-    """Sign and send one contract call, wait for it to be mined, return the receipt."""
-    w3 = _w3()
-    account = Account.from_key(private_key)
-    with _send_lock:
-        # EIP-1559 fees: pay 2x the current base fee as a ceiling, plus the node's suggested tip.
-        tip = w3.eth.max_priority_fee
-        base = w3.eth.get_block("latest")["baseFeePerGas"]
-        tx = fn.build_transaction({
-            "from": account.address,
-            "nonce": w3.eth.get_transaction_count(account.address, "pending"),
-            "maxPriorityFeePerGas": tip,
-            "maxFeePerGas": 2 * base + tip,
-            "chainId": w3.eth.chain_id,
-        })  # build_transaction also estimates gas, which raises if the vault would revert
-        signed = account.sign_transaction(tx)
-        tx_hash = w3.eth.send_raw_transaction(signed.raw_transaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=RECEIPT_TIMEOUT_S)
+    """Sign and send one contract call through the shared post office, return the receipt.
+    build_transaction also estimates gas, which raises if the vault would revert (so we never pay for a failure)."""
+    receipt = tx_sender.send(_w3(), private_key, fn.build_transaction, timeout=RECEIPT_TIMEOUT_S)
     if receipt["status"] != 1:
-        raise RuntimeError(f"transaction {tx_hash.hex()} reverted on-chain")
+        raise RuntimeError(f"transaction {_tx_hex(receipt)} reverted on-chain")
     return receipt
 
 
@@ -109,16 +92,9 @@ BOT_GAS_WEI = 10**15  # 0.001 test ETH: enough gas for a bot's trades on Sepolia
 
 def fund_gas(bot_address: str, wei: int = BOT_GAS_WEI) -> str:
     """Send a little Sepolia ETH so the bot's own key can pay gas for its trades."""
-    w3 = _w3()
-    account = Account.from_key(_operator_key())
-    with _send_lock:
-        tip = w3.eth.max_priority_fee
-        base = w3.eth.get_block("latest")["baseFeePerGas"]
-        tx = {"to": Web3.to_checksum_address(bot_address), "value": wei, "gas": 21000,
-              "nonce": w3.eth.get_transaction_count(account.address, "pending"),
-              "maxPriorityFeePerGas": tip, "maxFeePerGas": 2 * base + tip, "chainId": w3.eth.chain_id}
-        tx_hash = w3.eth.send_raw_transaction(account.sign_transaction(tx).raw_transaction)
-    return _tx_hex(w3.eth.wait_for_transaction_receipt(tx_hash, timeout=RECEIPT_TIMEOUT_S))
+    to = Web3.to_checksum_address(bot_address)
+    build = lambda fields: {**fields, "to": to, "value": wei, "gas": 21000}  # a plain ETH transfer costs 21000 gas
+    return _tx_hex(tx_sender.send(_w3(), _operator_key(), build, timeout=RECEIPT_TIMEOUT_S))
 
 
 # ---------------------------------------------------------------- vault reads
@@ -131,6 +107,11 @@ def equity(bot_id: int) -> int:
 def price() -> int:
     """ETH/USD from Chainlink, 8 decimals (so 3000.00 USD is 300000000000)."""
     return _vault().functions.priceView().call()
+
+
+def total_born() -> int:
+    """How many bots the vault has ever registered. Bot ids are 1..total_born."""
+    return _vault().functions.totalBorn().call()
 
 
 def counts(creator_id: str) -> tuple[int, int]:

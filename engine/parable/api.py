@@ -17,11 +17,13 @@ from pydantic import BaseModel
 
 from parable import world_pass
 from parable.config import get_settings
-from parable.launcher import ApprovalDenied, ApprovalPending, Launcher, LaunchError, real_backends, to_bytes32
+from parable.launcher import (ApprovalDenied, ApprovalPending, Launcher, LaunchError, LaunchFailed, real_backends,
+                              to_bytes32)
 from parable.bot_runner import available_brains
 from parable.models import BotRules
 
 STATIC = Path(__file__).parent / "static"
+FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "dist"  # the new React site, once built
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
 log = logging.getLogger("parable.api")
 _launcher: Launcher | None = None
@@ -84,9 +86,24 @@ def vault_call(fn, *args):
         raise HTTPException(409, get_launcher().b.vault.decode_revert(err))
 
 
+def arkiv_writer() -> str:
+    """The wallet that writes Parable's Arkiv rows (public address, worked out from the key locally)."""
+    s = get_settings()
+    if s.arkiv_writer_address:
+        return s.arkiv_writer_address
+    return Account.from_key(s.arkiv_private_key).address if s.arkiv_private_key else ""
+
+
 @app.get("/api/info")
 def info():
-    return {"offline": offline(), "explorer": EXPLORER_TX}
+    """Public facts the website shows as proof links. Addresses only, never keys."""
+    from parable.bot_runner import PRESETS
+
+    s = get_settings()
+    return {"offline": offline(), "explorer": EXPLORER_TX, "vault_address": s.vault_address,
+            "ens_parent": s.ens_parent_name, "arkiv_writer": arkiv_writer(),
+            "arkiv_explorer": "https://rabdi.explorer.arkiv.network", "ens_app": "https://sepolia.app.ens.domains/",
+            "strategies": list(PRESETS)}
 
 
 @app.get("/api/brains")
@@ -118,6 +135,8 @@ def confirm(pending_id: str, claim: str = Header("", alias="x-claim")):
         raise HTTPException(403, f"not approved: {err}")
     except LaunchError as err:
         raise HTTPException(404, str(err))
+    except LaunchFailed as err:
+        raise HTTPException(502, str(err))
     return {"bot": bot.model_dump(), "owner_token": claim, "tx_url": tx_url(bot.born_tx)}
 
 
@@ -147,6 +166,22 @@ def graveyard(creator_id: str):
 @app.get("/api/report")
 def report(creator: str | None = None, strategy: str | None = None, brain: str | None = None):
     return get_launcher().report(creator or None, strategy or None, brain or None)
+
+
+@app.get("/api/report/brains")
+def report_brains():
+    """The 'compare brains' table in one call (two Arkiv reads in total, not one per brain)."""
+    rows = get_launcher().b.arkiv.report_by_brain()
+    empty = {"launched": 0, "alive": 0, "dead": 0, "profitable": 0, "worst_pnl_bps": 0, "avg_pnl_bps": 0.0}
+    known = available_brains()
+    names = list(known) + sorted(set(rows) - set(known))  # brains set up here first, then old ones from the record
+    return [{"brain": b, "available": known.get(b, False), **rows.get(b, empty)} for b in names]
+
+
+@app.get("/api/bots/{bot_id}/events")
+def bot_events(bot_id: int):
+    """One bot's public timeline from Arkiv: birth, trades, blocked trades, death (newest first)."""
+    return [e.model_dump() for e in get_launcher().b.arkiv.events(bot_id)]
 
 
 @app.post("/api/bots/{bot_id}/{action}")
@@ -207,7 +242,16 @@ def cheat_second_identity():
 
 @app.get("/")
 def home():
+    """The new React site if it has been built (frontend/dist), otherwise the simple built-in dashboard."""
+    built = FRONTEND / "index.html"
+    return FileResponse(built if built.exists() else STATIC / "index.html")
+
+
+@app.get("/classic")
+def classic():
     return FileResponse(STATIC / "index.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+if (FRONTEND / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND / "assets"), name="assets")

@@ -58,10 +58,10 @@ def test_approved_launch_writes_every_record(setup):
     bot = lau.confirm_launch(pid, claim)
     assert bot.ens_name.startswith("bot-1-") and bot.ens_name.endswith(".parable.eth")
     assert lau.b.vault.bots[bot.bot_id]["status"] == "alive"
-    assert lau.b.arkiv.events[0].kind == "birth"
+    assert lau.b.arkiv.event_log[0].kind == "birth"
     assert lau.b.ens.is_valid(bot.ens_name, bot.bot_address)
-    with pytest.raises(Exception):  # an approval is single-use
-        lau.confirm_launch(pid, claim)
+    assert lau.confirm_launch(pid, claim).bot_id == bot.bot_id  # an approval is single-use: same bot back
+    assert len(lau.b.vault.bots) == 1
 
 
 def test_bot_trades_and_kill_goes_to_graveyard(setup):
@@ -70,7 +70,7 @@ def test_bot_trades_and_kill_goes_to_graveyard(setup):
     world.decide(pid, True)
     bot = lau.confirm_launch(pid, claim)
     time.sleep(0.2)
-    assert any(e.kind == "trade" for e in lau.b.arkiv.events)
+    assert any(e.kind == "trade" for e in lau.b.arkiv.event_log)
     with pytest.raises(LaunchError):
         lau.kill(bot.bot_id, "not-the-owner")  # strangers cannot kill
     lau.kill(bot.bot_id, claim)
@@ -89,3 +89,37 @@ def test_check_fails_when_not_over_limit_and_expiry_is_synced(setup):
         lau.check(bot.bot_id)
     lau.sync_deaths()  # lease is over, so the poller expires it and records the death
     assert lau.b.arkiv.graveyard(bot.creator_id)[0].cause == "expired"
+
+
+def test_confirm_is_safe_to_repeat(setup):
+    lau, world = setup
+    pid, claim = lau.start_launch(RULES)
+    world.decide(pid, True)
+    first = lau.confirm_launch(pid, claim)
+    assert lau.confirm_launch(pid, claim).bot_id == first.bot_id  # same bot again, not a second one
+    assert len(lau.live) == 1
+    with pytest.raises(LaunchError):
+        lau.confirm_launch(pid, "someone-else")
+
+
+def test_confirm_while_being_born_says_pending(setup):
+    lau, world = setup
+    pid, claim = lau.start_launch(RULES)
+    world.decide(pid, True)
+    lau.in_progress.add(pid)  # as if another request is creating the bot right now
+    with pytest.raises(ApprovalPending):
+        lau.confirm_launch(pid, claim)
+
+
+def test_chain_failure_becomes_a_clean_error(setup):
+    from parable.launcher import LaunchFailed
+
+    lau, world = setup
+    lau.b.vault.register_bot = lambda **k: (_ for _ in ()).throw(RuntimeError("replacement transaction underpriced"))
+    pid, claim = lau.start_launch(RULES)
+    world.decide(pid, True)
+    with pytest.raises(LaunchFailed) as err:
+        lau.confirm_launch(pid, claim)
+    assert "underpriced" not in str(err.value)  # raw chain errors never reach the user
+    with pytest.raises(LaunchFailed):
+        lau.confirm_launch(pid, claim)  # asking again gives the same answer, no second attempt

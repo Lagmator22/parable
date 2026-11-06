@@ -12,6 +12,7 @@ from eth_account import Account
 from eth_utils import keccak
 from web3 import Web3
 
+from parable import tx_sender
 from parable.config import Settings, get_settings
 
 ZERO_ADDRESS = "0x0000000000000000000000000000000000000000"
@@ -140,18 +141,13 @@ class EnsBadge:
         return int(self.w3.eth.get_block("latest")["timestamp"])
 
     def _send(self, fn) -> str:
-        """Sign one contract call with the operator key, send it, wait. Returns the tx hash."""
-        tx = fn.build_transaction(
-            {
-                "from": self.operator,
-                "nonce": self.w3.eth.get_transaction_count(self.operator, "pending"),
-                "chainId": self.w3.eth.chain_id,
-            }
-        )
-        tx_hash = self.w3.eth.send_raw_transaction(self._account.sign_transaction(tx).raw_transaction)
-        if self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)["status"] != 1:
-            raise BadgeError(f"tx reverted: {tx_hash.hex()}")
-        return "0x" + tx_hash.hex().removeprefix("0x")
+        """Sign one contract call with the operator key and send it through the shared post office
+        (the vault client uses the same one, so the two never pick the same transaction number)."""
+        receipt = tx_sender.send(self.w3, self._account.key, fn.build_transaction)
+        tx_hash = "0x" + receipt["transactionHash"].hex().removeprefix("0x")
+        if receipt["status"] != 1:
+            raise BadgeError(f"tx reverted: {tx_hash}")
+        return tx_hash
 
     def registry_for(self, name: str) -> str:
         """Address of the registry that holds the first label of `name`. Walk down from the root."""

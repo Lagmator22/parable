@@ -16,6 +16,7 @@ from types import SimpleNamespace
 from eth_account import Account
 
 from parable.models import BotEvent, BotRecord, BotRules, DeathRecord
+from parable.repair import Outbox, repair
 
 log = logging.getLogger("parable.launcher")
 CAUSES = {1: "expired", 2: "killed", 3: "loss_limit"}  # the vault's DeathCause numbers (vault.py already gives names)
@@ -31,6 +32,10 @@ class ApprovalPending(LaunchError):
 
 class ApprovalDenied(LaunchError):
     pass
+
+
+class LaunchFailed(Exception):
+    """Something broke on the way (chain, ENS). Any half-made bot is fixed later by repair.py."""
 
 
 def real_backends() -> SimpleNamespace:
@@ -77,6 +82,9 @@ class Launcher:
         self.live: dict[int, LiveBot] = {}
         self.lock = threading.Lock()
         self.counter = 0
+        self.in_progress: set[str] = set()  # launches being created right now
+        self.finished: dict[str, tuple[str, object]] = {}  # pending_id -> (claim hash, bot or error)
+        self.outbox = Outbox()  # Arkiv writes that failed and will be retried (the vault already has them)
 
     # ---------------------------------------------------------------- launching
     def start_launch(self, rules: BotRules) -> tuple[str, str]:
@@ -89,18 +97,38 @@ class Launcher:
         return pending_id, claim
 
     def confirm_launch(self, pending_id: str, claim: str) -> BotRecord:
-        entry = self.pending.get(pending_id)
-        if entry is None or not hmac.compare_digest(entry[1], claim):
-            raise LaunchError("unknown launch id or wrong claim token")
-        rules = entry[0]
-        approval = self.b.world.get_approval(pending_id)
-        if approval is None:
-            raise ApprovalPending("waiting for World ID approval")
-        if not approval.approved:
-            self.pending.pop(pending_id, None)
-            raise ApprovalDenied(approval.reason)
-        self.pending.pop(pending_id, None)  # an approval can launch only one bot
-        return self._create_bot(to_bytes32(approval.subject), rules, claim)
+        """Safe to call again and again (the page polls): while the bot is being born on-chain (about a
+        minute) the answer is 'pending', and afterwards every call returns the same bot."""
+        with self.lock:
+            done = self.finished.get(pending_id)
+            if done is not None and hmac.compare_digest(done[0], _hash(claim)):
+                if isinstance(done[1], Exception):
+                    raise done[1]
+                return done[1]
+            if pending_id in self.in_progress:
+                raise ApprovalPending("approved: the bot is being born on-chain (about a minute)")
+            entry = self.pending.get(pending_id)
+            if entry is None or not hmac.compare_digest(entry[1], claim):
+                raise LaunchError("unknown launch id or wrong claim token")
+            rules = entry[0]
+            approval = self.b.world.get_approval(pending_id)
+            if approval is None:
+                raise ApprovalPending("waiting for World ID approval")
+            self.pending.pop(pending_id, None)  # an approval can launch only one bot
+            if not approval.approved:
+                raise ApprovalDenied(approval.reason)
+            self.in_progress.add(pending_id)
+        try:
+            result = self._create_bot(to_bytes32(approval.subject), rules, claim)
+        except Exception:
+            log.exception("launch %s failed", pending_id)  # full detail stays in the server log
+            result = LaunchFailed("the launch failed while creating the bot on-chain; please try again")
+        with self.lock:
+            self.in_progress.discard(pending_id)
+            self.finished[pending_id] = (_hash(claim), result)
+        if isinstance(result, Exception):
+            raise result
+        return result
 
     def _create_bot(self, creator_id: str, rules: BotRules, claim: str) -> BotRecord:
         v = self.b.vault
@@ -121,8 +149,10 @@ class Launcher:
         )
         record = BotRecord(bot_id=bot_id, bot_address=wallet.address, creator_id=creator_id, ens_name=ens_name,
                            strategy=rules.strategy, rules=rules, status="alive", born_at=now, born_tx=tx)
-        self.b.arkiv.put_bot(record, rules.lease_seconds)
-        self.b.arkiv.put_event(BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name}))
+        # From here the bot exists in the vault, so an Arkiv hiccup must not fail the launch: queue and retry.
+        self.outbox.run(f"bot {bot_id} record", lambda: self.b.arkiv.put_bot(record, rules.lease_seconds))
+        birth = BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name})
+        self.outbox.run(f"bot {bot_id} birth", lambda: self.b.arkiv.put_event(birth))
         bot = LiveBot(record=record, key="0x" + wallet.key.hex().removeprefix("0x"), expires_at=expires_at, node=node,
                       owner_hash=_hash(claim))
         self.live[bot_id] = bot
@@ -141,10 +171,7 @@ class Launcher:
             tx_hash = data.pop("tx", None)
             event = BotEvent(bot_id=bot_id, kind="trade" if kind == "traded" else "rejected",
                              at=int(time.time()), tx_hash=tx_hash, data=data)
-            try:  # a failed Arkiv write must never stop the bot
-                self.b.arkiv.put_event(event)
-            except Exception:
-                log.exception("could not write %s event", kind)
+            self.outbox.run(f"bot {bot_id} {kind}", lambda: self.b.arkiv.put_event(event))  # never stops the bot
 
         args = (bot_id, bot.key, rules, bot.stop, report)
         threading.Thread(target=self.b.runner.run_bot, args=args, daemon=True).start()
@@ -207,17 +234,40 @@ class Launcher:
                             start_cash_usd=r.rules.start_cash_usd,
                             pnl_bps=(final - r.rules.start_cash_usd) * 10000 // r.rules.start_cash_usd,
                             lifetime_s=died_at - r.born_at, tx_hash=tx_hash or "")
-        self.b.arkiv.put_death(death, creator_id=r.creator_id, strategy=r.strategy, brain=r.rules.brain)
-        self.b.arkiv.put_event(BotEvent(bot_id=r.bot_id, kind="death", at=died_at, tx_hash=tx_hash,
-                                        data={"cause": cause, "pnl_bps": death.pnl_bps}))
-        if self.b.ens.is_valid(r.ens_name, r.bot_address):  # the vault revokes its own oracle; also revoke the ENS name
-            self.b.ens.revoke_badge(r.ens_name)
+        ark = self.b.arkiv
+        self.outbox.run(f"bot {r.bot_id} grave",
+                        lambda: ark.put_death(death, creator_id=r.creator_id, strategy=r.strategy, brain=r.rules.brain))
+        event = BotEvent(bot_id=r.bot_id, kind="death", at=died_at, tx_hash=tx_hash,
+                         data={"cause": cause, "pnl_bps": death.pnl_bps})
+        self.outbox.run(f"bot {r.bot_id} death", lambda: ark.put_event(event))
+        try:  # the vault already revoked its own badge check; also burn the ENS name (best effort)
+            if self.b.ens.is_valid(r.ens_name, r.bot_address):
+                self.b.ens.revoke_badge(r.ens_name)
+        except Exception:
+            log.exception("could not revoke ENS name %s", r.ens_name)
 
-    def start_poller(self, every_s: float = 5) -> None:
+    def repair_record(self) -> list[str]:
+        """Fill any gap between the vault and Arkiv (see repair.py). Bots this server runs are handled live."""
+        if not hasattr(self.b.vault, "total_born"):
+            return []
+        fixes = repair(self.b.vault, self.b.arkiv, skip_ids=set(self.live))
+        for line in fixes:
+            log.info("repair: %s", line)
+        return fixes
+
+    def start_poller(self, every_s: float = 5, repair_every: int = 12) -> None:
         def loop():
+            tick = 0
             while True:
+                if tick % repair_every == 0:  # first pass at startup, then about once a minute
+                    try:
+                        self.repair_record()
+                    except Exception:
+                        log.exception("repair pass failed")
                 time.sleep(every_s)
+                tick += 1
                 self.sync_deaths()
+                self.outbox.flush()
 
         threading.Thread(target=loop, daemon=True).start()
 

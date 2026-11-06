@@ -117,3 +117,31 @@ def test_brain_travels_to_bot_graveyard_and_report(client, monkeypatch):
     assert c.get(f"/api/graveyard/{bot['creator_id']}").json()[0]["brain"] == "gemini:m"
     assert c.get("/api/report", params={"brain": "gemini:m"}).json()["dead"] == 1
     assert c.get("/api/report", params={"brain": "rule"}).json()["launched"] == 0
+
+
+def test_brain_table_events_and_info_in_one_go(client):
+    c, world, _ = client
+    bot = launch(c, world)
+    rows = c.get("/api/report/brains").json()
+    rule = next(r for r in rows if r["brain"] == "rule")
+    assert rule["available"] and rule["launched"] == 1
+    events = c.get(f"/api/bots/{bot['bot_id']}/events").json()
+    assert events[-1]["kind"] == "birth"  # newest first, so birth is last
+    info = c.get("/api/info").json()
+    assert set(info["strategies"]) >= {"momentum", "dip_buyer", "yolo"}
+    assert not any("key" in k or "secret" in k for k in info)  # public facts only
+
+
+def test_launch_survives_an_arkiv_outage(client):
+    c, world, lau = client
+    real_put = lau.b.arkiv.put_bot
+
+    def down(*a, **k):
+        raise RuntimeError("arkiv down")
+
+    lau.b.arkiv.put_bot = down
+    bot = launch(c, world)  # the vault registered the bot, so the launch must still succeed
+    assert bot["bot_id"] == 1 and len(lau.outbox.items) == 1
+    lau.b.arkiv.put_bot = real_put
+    assert lau.outbox.flush() == 0
+    assert [r.bot_id for r in lau.b.arkiv.records] == [1]

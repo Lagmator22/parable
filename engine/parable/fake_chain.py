@@ -128,6 +128,9 @@ class FakeVault:
         cause = ["none", "expired", "killed", "loss_limit"][b["cause"] or 0]  # same names as vault.py
         return {"status": b["status"], "cause": cause, "finalEquityUsd": b["final"], "diedAt": b["died_at"]}
 
+    def total_born(self) -> int:
+        return len(self.bots)
+
     def counts(self, creator_id: str) -> tuple[int, int]:
         mine = [b for b in self.bots.values() if b["creator_id"] == creator_id]
         return len(mine), sum(b["status"] == "dead" for b in mine)
@@ -138,15 +141,15 @@ class FakeVault:
 
 class FakeArkiv:
     def __init__(self):
-        self.records, self.events, self.deaths = [], [], []  # deaths: (DeathRecord, creator_id, strategy)
+        self.records, self.event_log, self.deaths = [], [], []  # deaths: (DeathRecord, creator_id, strategy)
 
     def put_bot(self, rec, lease_seconds):
         self.records.append(rec)
         return f"fake-key-{rec.bot_id}"
 
     def put_event(self, ev):
-        self.events.append(ev)
-        return f"fake-event-{len(self.events)}"
+        self.event_log.append(ev)
+        return f"fake-event-{len(self.event_log)}"
 
     def put_death(self, d, creator_id=None, strategy=None, brain=None):
         self.deaths.append((d, creator_id, strategy))
@@ -160,6 +163,16 @@ class FakeArkiv:
 
     def bots(self, creator_id=None, status=None):
         return [r for r in self.records if creator_id in (None, r.creator_id) and status in (None, r.status)]
+
+    def events(self, bot_id):
+        return sorted((e for e in self.event_log if e.bot_id == bot_id), key=lambda e: e.at, reverse=True)
+
+    def report_by_brain(self):
+        out = {}
+        for brain in {r.rules.brain for r in self.records}:
+            card = self.report_card(brain=brain).model_dump()
+            out[brain] = {k: card[k] for k in ("launched", "alive", "dead", "profitable", "worst_pnl_bps", "avg_pnl_bps")}
+        return out
 
     def report_card(self, creator_id=None, strategy=None, brain=None):
         mine = [r for r in self.records if creator_id in (None, r.creator_id) and strategy in (None, r.strategy)
