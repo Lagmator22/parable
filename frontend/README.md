@@ -11,4 +11,4 @@ npm run dev
 
 Open the printed local URL. To make the production files, run `npm run build`; they appear in `frontend/dist/`.
 
-This first design pass includes the landing page, theme switch, and menu. The app sections are clearly marked placeholders and are not yet connected to the Python API. The API contract is in `../docs/FRONTEND_CONTRACT.md`.
+This design pass includes the landing page, theme switch, and menu. The application views are not yet connected to the Python API. The API contract is in `../docs/FRONTEND_CONTRACT.md`.
