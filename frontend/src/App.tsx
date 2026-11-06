@@ -1,6 +1,7 @@
 // This simple landing page explains Parable and links to its real sections.
 // The full application views will be connected to the Python engine later.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Moon, Sun, X } from 'lucide-react';
 import { ScrambleButton, ScrambleLink } from './components/ui/ScrambleButton';
 
@@ -15,19 +16,43 @@ function savedTheme(): Theme {
 export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [ripple, setRipple] = useState<{ x: number; y: number; next: Theme } | null>(null);
+  const switching = useRef(false);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem('parable-theme', theme); } catch { /* private browsing */ }
   }, [theme]);
   function toggleTheme(event: React.MouseEvent<HTMLButtonElement>) {
+    if (switching.current) return;
     const next = theme === 'dark' ? 'light' : 'dark';
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setTheme(next); return; }
-    setRipple({ x: event.clientX, y: event.clientY, next });
-    window.setTimeout(() => { setTheme(next); setRipple(null); }, 520);
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion || !document.startViewTransition) { setTheme(next); return; }
+    switching.current = true;
+    const root = document.documentElement;
+    const x = event.clientX;
+    const y = event.clientY;
+    const radius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.style.setProperty('--reveal-x', `${x}px`);
+    root.style.setProperty('--reveal-y', `${y}px`);
+    root.style.setProperty('--reveal-radius', `${radius}px`);
+    const transition = document.startViewTransition(() => {
+      root.dataset.theme = next;
+      flushSync(() => setTheme(next));
+    });
+    transition.finished.finally(() => { switching.current = false; });
   }
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
   return <div className="site-shell" id="top">
-    <header className="site-header">
+    <header className="site-header" inert={menuOpen}>
       <a className="brand" href="#top">Parable<span>.</span></a>
       <div className="header-actions">
         <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? <Sun size={22}/> : <Moon size={22}/>}</button>
@@ -39,7 +64,7 @@ export default function App() {
       <div className="menu-links">{nav.map((link, index) => <ScrambleLink key={link.href} label={`${String(index + 1).padStart(2, '0')}  ${link.label}`} href={link.href} onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1} arrow />)}</div>
       <p>Every strategy has a graveyard. Now you can see it.</p>
     </nav>
-    <main>
+    <main inert={menuOpen}>
       <section className="hero">
         <div className="hero-copy">
           <div className="eyebrow"><span className="status-dot"/>THE PUBLIC RECORD FOR AI TRADING BOTS</div>
@@ -49,9 +74,9 @@ export default function App() {
         </div>
         <div className="hero-visual" aria-label="Illustration of a bot's public history">
           <div className="visual-top"><span>BOT HISTORY</span><span>PUBLIC · VERIFIABLE</span></div>
-          <div className="visual-line"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div><b>↗</b></div>
-          <div className="visual-line"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div><b>↗</b></div>
-          <div className="visual-line"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div><b>↗</b></div>
+          <div className="visual-line"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div></div>
+          <div className="visual-line"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div></div>
+          <div className="visual-line"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></div>
           <div className="visual-bottom">AN ILLUSTRATION OF THE RECORD</div>
         </div>
       </section>
@@ -65,7 +90,6 @@ export default function App() {
       </section>
       <section className="trust-section" id="trust"><span>WHY TRUST IT</span><h2>Don’t take a bot’s<br/><em>word for it.</em></h2><p>Parable’s vault is the source of truth. It counts every bot and every trade. The public record carries transaction links, so anyone can check the history independently.</p><div className="trust-note"><strong>Built on Sepolia with practice funds.</strong><span>The record shows honesty about results, not proof that a strategy will make money.</span></div></section>
     </main>
-    <footer><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top"/></footer>
-    {ripple && <div className="theme-ripple" style={{ '--ripple-x': `${ripple.x}px`, '--ripple-y': `${ripple.y}px`, background: ripple.next === 'light' ? '#eee9dc' : '#101210' } as React.CSSProperties} aria-hidden="true"/>}
+    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top"/></footer>
   </div>;
 }
