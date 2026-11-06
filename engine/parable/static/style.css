@@ -17,4 +17,5 @@ button.cheat, button.small { background:#2d3542; color:var(--text); }
 .tomb { text-align:center; border-color:#5a4a3a; }
 .good { color:var(--good); } .bad { color:var(--bad); } .muted { color:var(--muted); font-size:.9rem; }
 a { color: var(--accent); }
+table { border-collapse:collapse; } th, td { padding:4px 12px; text-align:left; } th { color:var(--text); }
 pre { white-space:pre-wrap; word-break:break-word; }

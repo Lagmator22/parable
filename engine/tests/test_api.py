@@ -72,3 +72,46 @@ def test_info_reports_offline_flag(client, monkeypatch):
     c, _, _ = client
     monkeypatch.setenv("PARABLE_OFFLINE", "1")
     assert c.get("/api/info").json()["offline"] is True
+
+
+# ---------------------------------------------------------------- brains
+
+def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
+    s = api.get_settings()
+    monkeypatch.setattr(s, "gemini_api_key", "SECRET-GOOGLE-KEY")
+    monkeypatch.setattr(s, "anthropic_api_key", "SECRET-CLAUDE-KEY")
+    monkeypatch.setattr(s, "gemini_model", "gem-model")
+    monkeypatch.setattr(s, "local_llm_model", "")
+    c, _, _ = client
+    r = c.get("/api/brains")
+    assert "SECRET" not in r.text and "gem-model" not in r.text
+    found = {b["brain"]: b["available"] for b in r.json()}
+    assert found == {"rule": True, "claude": True, "gemini": True, "gemma": True, "local": False}
+
+
+def test_launch_with_unconfigured_brain_is_rejected(client, monkeypatch):
+    monkeypatch.setattr(api.get_settings(), "gemini_api_key", "")
+    c, _, lau = client
+    assert c.post("/api/launch", json={"brain": "gemini"}).status_code == 400
+    assert lau.pending == {}  # nothing was started
+
+
+def test_launch_with_unknown_brain_is_rejected(client):
+    c, _, _ = client
+    assert c.post("/api/launch", json={"brain": "gpt-9000"}).status_code == 422
+
+
+def test_brain_travels_to_bot_graveyard_and_report(client, monkeypatch):
+    s = api.get_settings()
+    monkeypatch.setattr(s, "gemini_api_key", "k")
+    monkeypatch.setattr(s, "gemini_model", "m")
+    c, world, _ = client
+    body = c.post("/api/launch", json={"brain": "gemini"}).json()
+    world.decide(body["pending_id"], True)
+    out = c.post(f"/api/launch/{body['pending_id']}/confirm", headers={"x-claim": body["claim"]}).json()
+    bot = out["bot"]
+    assert bot["rules"]["brain"] == "gemini"
+    c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": out["owner_token"]})
+    assert c.get(f"/api/graveyard/{bot['creator_id']}").json()[0]["brain"] == "gemini"
+    assert c.get("/api/report", params={"brain": "gemini"}).json()["dead"] == 1
+    assert c.get("/api/report", params={"brain": "rule"}).json()["launched"] == 0

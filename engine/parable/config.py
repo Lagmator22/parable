@@ -44,12 +44,13 @@ class Settings(BaseSettings):
     world_mock: bool = False
     anthropic_api_key: str = ""
     bot_model: str = "claude-haiku-5-5"
-    # Which brain the bots use: "rule" (free, no AI), "anthropic" (Claude), or "openai_compat"
-    # (any free/cheap OpenAI-style API: Gemini, OpenRouter, Groq, a local Ollama). Empty = Claude if a key is set, else rule.
-    bot_provider: str = ""
-    llm_base_url: str = ""   # e.g. https://generativelanguage.googleapis.com/v1beta/openai
-    llm_api_key: str = ""
-    llm_model: str = ""      # e.g. gemini-2.5-flash
+    # Other bot brains (a bot picks one at launch). Gemini and Gemma share one Google key.
+    gemini_api_key: str = ""
+    gemini_model: str = ""
+    gemma_model: str = "gemma-4-31b-it"
+    # Any local OpenAI-style server (Ollama). No key needed.
+    local_llm_base_url: str = "http://localhost:11434/v1"
+    local_llm_model: str = ""
 
 
 @lru_cache

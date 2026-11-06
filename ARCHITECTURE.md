@@ -187,4 +187,26 @@
 | 10 | "Unregistered bot" demo shows `NotBot`; clearer to also show `NotRegistered` | 🟢 Polish | Add a second cheat button |
 | 11 | MCP (Claude Code / Codex access) and the Opus manager are not started | ⚪ Stretch | Phase 4, only after the core runs for real |
 
+## 9. Bot brains
+Each bot is launched with one "brain" (the thing that decides buy, sell or hold). The report card can then compare brains fairly.
+```
+  Launch form: pick a brain ──▶ server checks it is set up (no key / model? → refused)
+        │
+        ▼
+  Every 30 seconds the bot asks its brain:
+     rule    free built-in rule ............ always works
+     claude  Anthropic (needs key)
+     gemini  Google, flash model ┐
+     gemma   Google, Gemma model ┴ same Google key
+     local   your own computer (Ollama), no key
+        │
+        ├── brain answers fine ──▶ trade (size cut down to the safe limit)
+        └── brain fails or answers nonsense ──▶ the free rule decides instead,
+                                                note starts with "[fallback:rule]"
+        ▼
+  Vault checks the real limits anyway ──▶ every bot record and grave remembers its brain
+        ▼
+  Dashboard "Compare brains" table: launched / dead / profitable / worst loss / average, per brain
+```
+
 *Phase 2 status: 69 automated tests pass; full flow works in offline simulation; real-chain run waits for keys.*

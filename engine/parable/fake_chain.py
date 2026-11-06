@@ -148,7 +148,7 @@ class FakeArkiv:
         self.events.append(ev)
         return f"fake-event-{len(self.events)}"
 
-    def put_death(self, d, creator_id=None, strategy=None):
+    def put_death(self, d, creator_id=None, strategy=None, brain=None):
         self.deaths.append((d, creator_id, strategy))
         for r in self.records:
             if r.bot_id == d.bot_id:
@@ -161,10 +161,11 @@ class FakeArkiv:
     def bots(self, creator_id=None, status=None):
         return [r for r in self.records if creator_id in (None, r.creator_id) and status in (None, r.status)]
 
-    def report_card(self, creator_id=None, strategy=None):
-        mine = [r for r in self.records if creator_id in (None, r.creator_id) and strategy in (None, r.strategy)]
+    def report_card(self, creator_id=None, strategy=None, brain=None):
+        mine = [r for r in self.records if creator_id in (None, r.creator_id) and strategy in (None, r.strategy)
+                and brain in (None, r.rules.brain)]
         pnls = [d.pnl_bps for d, _, _ in self.deaths if d.bot_id in {r.bot_id for r in mine}]
-        return ReportCard(subject=creator_id or strategy or "all", launched=len(mine),
+        return ReportCard(subject=creator_id or strategy or (f"brain:{brain}" if brain else "all"), launched=len(mine),
                           alive=sum(r.status == "alive" for r in mine), dead=len(pnls),
                           profitable=sum(p > 0 for p in pnls), worst_pnl_bps=min(pnls, default=0),
                           avg_pnl_bps=sum(pnls) / len(pnls) if pnls else 0.0, vault_count_matches=True)

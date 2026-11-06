@@ -90,7 +90,7 @@ class ArkivStore:
         attrs = {
             "bot_id": _n("u256", rec.bot_id), "bot_address": ["addr", rec.bot_address],
             "creator_id": _s(_creator(rec.creator_id)), "ens_name": _s(rec.ens_name),
-            "strategy": _s(rec.strategy), "status": _s("alive"), "born_at": _n("u64", rec.born_at),
+            "strategy": _s(rec.strategy), "brain": _s(rec.rules.brain), "status": _s("alive"), "born_at": _n("u64", rec.born_at),
             "vault_tx": _s(rec.born_tx.lower()),
         }
         return self._create(BOT, attrs, lease_seconds, rec.model_dump_json())
@@ -101,17 +101,19 @@ class ArkivStore:
             attrs["vault_tx"] = _s(ev.tx_hash.lower())
         return self._create(EVENT, attrs, EVENT_LIFETIME, ev.model_dump_json(), readonly=True)
 
-    def put_death(self, d: DeathRecord, creator_id: str | None = None, strategy: str | None = None) -> str:
+    def put_death(self, d: DeathRecord, creator_id: str | None = None, strategy: str | None = None,
+                  brain: str | None = None) -> str:
         """Write the grave (read-only, long-lived), then mark the bot entity dead and keep it around."""
         bot = self._bot_row(d.bot_id)
         if bot is not None:
             creator_id = creator_id or bot["attributes"]["creator_id"]
             strategy = strategy or bot["attributes"]["strategy"]
+            brain = brain or bot["attributes"].get("brain")
         if not creator_id or not strategy:
             raise ArkivError(f"bot {d.bot_id}: creator_id/strategy unknown (bot entity gone); pass them in")
         attrs = {
             "bot_id": _n("u256", d.bot_id), "creator_id": _s(_creator(creator_id)), "strategy": _s(strategy),
-            "cause": _s(d.cause), "pnl_bps": _n("i32", d.pnl_bps), "lifetime_s": _n("u64", d.lifetime_s),
+            "brain": _s(brain or "rule"), "cause": _s(d.cause), "pnl_bps": _n("i32", d.pnl_bps), "lifetime_s": _n("u64", d.lifetime_s),
             "vault_tx": _s(d.tx_hash.lower()),
         }
         key = self._create(DEATH, attrs, DEATH_LIFETIME, d.model_dump_json(), readonly=True)
@@ -140,11 +142,13 @@ class ArkivStore:
         )
         return [BotRecord.model_validate_json(r["body"]) for r in rows]
 
-    def _deaths(self, creator_id: str | None = None, strategy: str | None = None) -> list[DeathRecord]:
+    def _deaths(self, creator_id: str | None = None, strategy: str | None = None,
+                brain: str | None = None) -> list[DeathRecord]:
         rows = self._query(
             DEATH,
             creator_id=_s(_creator(creator_id)) if creator_id else None,
             strategy=_s(strategy) if strategy else None,
+            brain=_s(brain) if brain else None,
         )
         return [DeathRecord.model_validate_json(r["body"]) for r in rows]
 
@@ -152,7 +156,8 @@ class ArkivStore:
         return sorted(self._deaths(creator_id=creator_id), key=lambda d: d.bot_id)
 
     def report_card(
-        self, creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None
+        self, creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None,
+        brain: str | None = None,
     ) -> ReportCard:
         """Counted from ALL bot and death rows, graveyard included.
 
@@ -160,15 +165,16 @@ class ArkivStore:
         vault_count_matches is False, because we never claim a check we did not do.
         """
         c = _creator(creator_id) if creator_id else None
-        bot_rows = self._query(BOT, creator_id=_s(c) if c else None, strategy=_s(strategy) if strategy else None)
+        bot_rows = self._query(BOT, creator_id=_s(c) if c else None, strategy=_s(strategy) if strategy else None,
+                               brain=_s(brain) if brain else None)
         bots = [BotRecord.model_validate_json(r["body"]) for r in bot_rows]
-        deaths = self._deaths(creator_id=c, strategy=strategy)
+        deaths = self._deaths(creator_id=c, strategy=strategy, brain=brain)
 
         dead_ids = {d.bot_id for d in deaths} | {b.bot_id for b in bots if b.status == "dead"}
         all_ids = {b.bot_id for b in bots} | dead_ids
         pnls = [d.pnl_bps for d in deaths]
         return ReportCard(
-            subject=creator_id or (f"strategy:{strategy}" if strategy else "all"),
+            subject=creator_id or (f"strategy:{strategy}" if strategy else f"brain:{brain}" if brain else "all"),
             launched=len(all_ids),
             alive=len({b.bot_id for b in bots if b.status == "alive"} - dead_ids),
             dead=len(dead_ids),
@@ -200,8 +206,8 @@ def put_event(ev: BotEvent) -> str:
     return default_store().put_event(ev)
 
 
-def put_death(d: DeathRecord, creator_id: str | None = None, strategy: str | None = None) -> str:
-    return default_store().put_death(d, creator_id, strategy)
+def put_death(d: DeathRecord, creator_id: str | None = None, strategy: str | None = None, brain: str | None = None) -> str:
+    return default_store().put_death(d, creator_id, strategy, brain)
 
 
 def graveyard(creator_id: str) -> list[DeathRecord]:
@@ -212,5 +218,6 @@ def bots(creator_id: str | None = None, status: str | None = None) -> list[BotRe
     return default_store().bots(creator_id, status)
 
 
-def report_card(creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None) -> ReportCard:
-    return default_store().report_card(creator_id, strategy, vault_count)
+def report_card(creator_id: str | None = None, strategy: str | None = None, vault_count: int | None = None,
+                brain: str | None = None) -> ReportCard:
+    return default_store().report_card(creator_id, strategy, vault_count, brain)

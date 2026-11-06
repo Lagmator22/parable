@@ -15,6 +15,7 @@
       <h2>Launch bot</h2>
       <div class="row">
         <label>Strategy <select id="strategy"><option>momentum</option><option>mean-reversion</option></select></label>
+        <label>Brain <select id="brain"><option>rule</option></select></label>
         <label>Cash $ <input id="cash" type="number" value="100"></label>
         <label>Max trade $ <input id="maxtrade" type="number" value="20"></label>
         <label>Max loss % <input id="maxloss" type="number" value="10"></label>
@@ -25,6 +26,10 @@
     </section>
     <section><h2>Live bots</h2><div id="live" class="cards"></div></section>
     <section><h2>🪦 Graveyard</h2><div id="graveyard" class="cards"></div></section>
+    <section>
+      <h2>Compare brains</h2>
+      <table id="compare" class="muted"></table>
+    </section>
     <section><h2>Report card</h2><div id="report" class="muted">Launch a bot to see your report card.</div></section>
     <section>
       <h2>Try to cheat</h2>

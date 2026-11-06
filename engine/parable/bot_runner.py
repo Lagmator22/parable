@@ -1,5 +1,5 @@
-"""The trading bot's brain and loop. Claude Haiku picks buy/sell/hold from the price history;
-if the AI is unavailable or answers badly, a simple built-in rule decides instead.
+"""The trading bot's brain and loop. Each bot has a chosen brain (rule, claude, gemini, gemma, local) that picks
+buy/sell/hold from the price history; if an AI brain is unavailable or answers badly, the built-in rule decides instead.
 The vault (not this file) enforces the real limits; clamping here just avoids silly requests.
 """
 
@@ -103,34 +103,64 @@ def claude_decide(state: dict) -> TradeDecision:
     return TradeDecision.model_validate(block.input)
 
 
-def openai_compat_decide(state: dict) -> TradeDecision:
-    """Free/cheap option: any OpenAI-style chat API (Gemini, OpenRouter, Groq, Ollama). We ask for JSON only."""
-    settings = get_settings()
+GOOGLE_BASE = "https://generativelanguage.googleapis.com/v1beta/openai"  # Google's OpenAI-style endpoint
+FALLBACK_TAG = "[fallback:rule]"  # starts the reason whenever the rule stepped in for a failed AI brain
+
+
+def openai_style_decide(state: dict, base_url: str, api_key: str, model: str) -> TradeDecision:
+    """Any OpenAI-style chat API (Google, Ollama, ...). We ask for JSON only. api_key may be empty (local)."""
     prompt = build_prompt(state).replace("Call decide_trade.", "Reply with ONLY a JSON object matching: "
                                          + json.dumps(DECISION_SCHEMA["properties"]) + ".")
-    r = httpx.post(f"{settings.llm_base_url.rstrip('/')}/chat/completions", timeout=LLM_TIMEOUT_S,
-                   headers={"Authorization": f"Bearer {settings.llm_api_key}"},
-                   json={"model": settings.llm_model, "messages": [{"role": "user", "content": prompt}],
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    r = httpx.post(f"{base_url.rstrip('/')}/chat/completions", timeout=LLM_TIMEOUT_S, headers=headers,
+                   json={"model": model, "messages": [{"role": "user", "content": prompt}],
                          "response_format": {"type": "json_object"}})
     r.raise_for_status()
     text = r.json()["choices"][0]["message"]["content"]
     return TradeDecision.model_validate_json(text.strip().removeprefix("```json").removesuffix("```").strip())
 
 
-def provider() -> str:
-    """Which brain to use. Empty setting = Claude if we have a key, otherwise the free rule."""
-    settings = get_settings()
-    return settings.bot_provider or ("anthropic" if settings.anthropic_api_key else "rule")
+def gemini_decide(state: dict) -> TradeDecision:
+    s = get_settings()
+    return openai_style_decide(state, GOOGLE_BASE, s.gemini_api_key, s.gemini_model)
 
 
-def decide(state: dict) -> TradeDecision:
-    """AI first (if configured); on ANY failure fall back to the rule. Result is always clamped."""
-    brains = {"anthropic": claude_decide, "openai_compat": openai_compat_decide}
-    brain = brains.get(provider())
+def gemma_decide(state: dict) -> TradeDecision:
+    s = get_settings()
+    return openai_style_decide(state, GOOGLE_BASE, s.gemini_api_key, s.gemma_model)
+
+
+def local_decide(state: dict) -> TradeDecision:
+    s = get_settings()
+    return openai_style_decide(state, s.local_llm_base_url, "", s.local_llm_model)
+
+
+# The brains a bot can choose: how each decides, and what must be set before it can be used.
+BRAINS = {
+    "rule": {"decide": rule_decide, "ready": lambda s: True},
+    "claude": {"decide": claude_decide, "ready": lambda s: bool(s.anthropic_api_key and s.bot_model)},
+    "gemini": {"decide": gemini_decide, "ready": lambda s: bool(s.gemini_api_key and s.gemini_model)},
+    "gemma": {"decide": gemma_decide, "ready": lambda s: bool(s.gemini_api_key and s.gemma_model)},
+    "local": {"decide": local_decide, "ready": lambda s: bool(s.local_llm_base_url and s.local_llm_model)},
+}
+
+
+def available_brains() -> dict[str, bool]:
+    """For the dashboard: is each brain set up? Only true/false, never any key."""
+    s = get_settings()
+    return {name: bool(b["ready"](s)) for name, b in BRAINS.items()}
+
+
+def decide(state: dict, brain: str = "rule") -> TradeDecision:
+    """Use the chosen brain; an unset-up or failing AI brain falls back to the rule and says so in the reason."""
+    entry = BRAINS.get(brain, BRAINS["rule"])
     try:
-        decision = brain(state) if brain else rule_decide(state)
+        if not entry["ready"](get_settings()):
+            raise RuntimeError(f"brain {brain} is not configured")
+        decision = entry["decide"](state)
     except Exception:
-        decision = rule_decide(state)
+        fallback = rule_decide(state)
+        decision = fallback.model_copy(update={"reason": f"{FALLBACK_TAG} {fallback.reason}"})
     return clamp(decision, state)
 
 
@@ -156,7 +186,7 @@ def run_bot(bot_id: int, bot_key: str, rules: BotRules, stop_event: Event,
             if bot["status"] != "alive" or time.time() >= bot["expiresAt"]:
                 report("stopped", {"reason": bot["status"] if bot["status"] != "alive" else "expired"})
                 return
-            decision = decide(state)
+            decision = decide(state, rules.brain)
             if decision.action != "hold":
                 tx = vault.trade(bot_key, bot_id, decision.action == "buy", decision.amount_usd)
                 report("traded", {"action": decision.action, "amount_usd": decision.amount_usd,

@@ -5,6 +5,8 @@ from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from parable import bot_runner as B  # noqa: E402
@@ -33,9 +35,9 @@ def test_clamp_sell_with_no_eth_becomes_hold():
 def test_llm_failure_falls_back_to_rule(monkeypatch):
     def boom(state):
         raise TimeoutError("slow")
-    monkeypatch.setattr(B, "provider", lambda: "anthropic")
-    monkeypatch.setattr(B, "claude_decide", boom)
-    d = B.decide(STATE)  # rising price -> momentum buys
+    monkeypatch.setitem(B.BRAINS["claude"], "decide", boom)
+    monkeypatch.setitem(B.BRAINS["claude"], "ready", lambda s: True)
+    d = B.decide(STATE, "claude")  # rising price -> momentum buys
     assert d.action == "buy" and d.amount_usd == 10_000_000
 
 
@@ -45,8 +47,7 @@ def test_invalid_llm_output_falls_back(monkeypatch):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
                 content=[SimpleNamespace(type="tool_use", input={"action": "moon", "reason": "?"})]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    monkeypatch.setattr(B, "provider", lambda: "anthropic")
-    assert B.decide(STATE).action == "buy"  # validation error -> rule
+    assert B.decide(STATE, "claude").action == "buy"  # validation error -> rule
 
 
 def test_valid_llm_output_used(monkeypatch):
@@ -56,8 +57,7 @@ def test_valid_llm_output_used(monkeypatch):
                 content=[SimpleNamespace(type="tool_use",
                                          input={"action": "hold", "amount_usd": 0, "reason": "wait"})]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    monkeypatch.setattr(B, "provider", lambda: "anthropic")
-    assert B.decide(STATE).action == "hold"
+    assert B.decide(STATE, "claude").action == "hold"
 
 
 def test_yolo_trades_max():
@@ -81,8 +81,9 @@ def test_loop_reports_traded_and_rejected(monkeypatch):
     monkeypatch.setattr(B.vault, "get_bot", lambda i: alive)
     monkeypatch.setattr(B.vault, "price", lambda: PRICE)
     monkeypatch.setattr(B.vault, "equity", lambda i: 50_000_000)
-    monkeypatch.setattr(B, "provider", lambda: "anthropic")
-    monkeypatch.setattr(B, "claude_decide", lambda s: TradeDecision(action="buy", amount_usd=1_000_000, reason="t"))
+    monkeypatch.setitem(B.BRAINS["claude"], "decide", lambda s: TradeDecision(action="buy", amount_usd=1_000_000, reason="t"))
+    monkeypatch.setitem(B.BRAINS["claude"], "ready", lambda s: True)
+    rules = RULES.model_copy(update={"brain": "claude"})
     stop, events, calls = Event(), [], []
 
     def fake_trade(key, bot_id, buy, amount):
@@ -97,20 +98,11 @@ def test_loop_reports_traded_and_rejected(monkeypatch):
             stop.set()
     monkeypatch.setattr(B.vault, "trade", fake_trade)
     monkeypatch.setattr(B.vault, "decode_revert", lambda e: "OverTradeLimit")
-    B.run_bot(1, "key", RULES, stop, report, interval_s=0)
+    B.run_bot(1, "key", rules, stop, report, interval_s=0)
     assert events == ["traded", "rejected"]
 
 
 # ---------------------------------------------------------------- choosing the brain (edge cases)
-
-def test_rule_provider_never_calls_any_ai(monkeypatch):
-    def must_not_run(state):
-        raise AssertionError("AI was called in free rule mode")
-    monkeypatch.setattr(B, "provider", lambda: "rule")
-    monkeypatch.setattr(B, "claude_decide", must_not_run)
-    monkeypatch.setattr(B, "openai_compat_decide", must_not_run)
-    assert B.decide(STATE).action == "buy"
-
 
 def test_claude_is_not_forced_to_use_the_tool(monkeypatch):
     """Haiku 5.5 thinks by default; forcing a tool would be rejected, so we must ask with tool_choice=auto."""
@@ -134,9 +126,10 @@ def test_claude_reply_without_tool_call_falls_back(monkeypatch):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
                 content=[SimpleNamespace(type="text", text="I think you should buy")]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    monkeypatch.setattr(B, "provider", lambda: "anthropic")
-    assert B.decide(STATE).action == "buy"  # no tool call -> rule
+    assert B.decide(STATE, "claude").action == "buy"  # no tool call -> rule
 
+
+# ---------------------------------------------------------------- the brain registry
 
 class FakeHttp:
     def __init__(self, content):
@@ -149,28 +142,116 @@ class FakeHttp:
         return {"choices": [{"message": {"content": self.content}}]}
 
 
-def test_openai_compat_valid_json_is_used(monkeypatch):
-    monkeypatch.setattr(B, "provider", lambda: "openai_compat")
-    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp('{"action":"hold","amount_usd":0,"reason":"calm"}'))
-    assert B.decide(STATE).action == "hold"
+HOLD = '{"action":"hold","amount_usd":0,"reason":"calm"}'
 
 
-def test_openai_compat_json_in_code_fence_is_accepted(monkeypatch):
-    monkeypatch.setattr(B, "provider", lambda: "openai_compat")
-    fenced = '```json\n{"action":"hold","amount_usd":0,"reason":"calm"}\n```'
-    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp(fenced))
-    assert B.decide(STATE).action == "hold"
+@pytest.fixture
+def configured(monkeypatch):
+    """Every brain is set up, with fake keys and models; returns the list of HTTP calls the brains make."""
+    s = B.get_settings()
+    for name, value in dict(anthropic_api_key="k-claude", gemini_api_key="k-google", gemini_model="gem-model",
+                            gemma_model="gemma-model", local_llm_base_url="http://local:1/v1",
+                            local_llm_model="llama-x").items():
+        monkeypatch.setattr(s, name, value)
+    calls = []
+
+    def fake_post(url, headers=None, json=None, timeout=None):
+        calls.append({"url": url, "headers": headers, "model": json["model"]})
+        return FakeHttp(HOLD)
+    monkeypatch.setattr(B.httpx, "post", fake_post)
+    return calls
 
 
-def test_openai_compat_garbage_falls_back_to_rule(monkeypatch):
-    monkeypatch.setattr(B, "provider", lambda: "openai_compat")
-    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp("buy everything!!!"))
-    assert B.decide(STATE).action == "buy"
+def test_rule_brain_never_calls_any_ai(monkeypatch):
+    def must_not_run(*a, **k):
+        raise AssertionError("AI was called in free rule mode")
+    monkeypatch.setattr(B.httpx, "post", must_not_run)
+    monkeypatch.setattr(B.anthropic, "Anthropic", must_not_run)
+    d = B.decide(STATE, "rule")
+    assert d.action == "buy" and not d.reason.startswith(B.FALLBACK_TAG)
 
 
-def test_openai_compat_network_error_falls_back(monkeypatch):
+@pytest.mark.parametrize("brain,url,model,key", [
+    ("gemini", B.GOOGLE_BASE + "/chat/completions", "gem-model", "k-google"),
+    ("gemma", B.GOOGLE_BASE + "/chat/completions", "gemma-model", "k-google"),
+    ("local", "http://local:1/v1/chat/completions", "llama-x", None),
+])
+def test_each_brain_calls_its_own_endpoint_and_model(configured, brain, url, model, key):
+    assert B.decide(STATE, brain).action == "hold"
+    call = configured[0]
+    assert (call["url"], call["model"]) == (url, model)
+    assert call["headers"] == ({"Authorization": f"Bearer {key}"} if key else {})  # local sends no key
+
+
+def test_claude_brain_uses_claude_not_http(configured, monkeypatch):
+    class FakeClient:
+        def __init__(self, **kw):
+            self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
+                content=[SimpleNamespace(type="tool_use", input={"action": "hold", "amount_usd": 0, "reason": "c"})]))
+    monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
+    assert B.decide(STATE, "claude").reason == "c" and configured == []
+
+
+@pytest.mark.parametrize("brain", ["claude", "gemini", "gemma", "local"])
+def test_unconfigured_brain_falls_back_with_tag(monkeypatch, brain):
+    s = B.get_settings()
+    for name in ("anthropic_api_key", "gemini_api_key", "gemini_model", "local_llm_model"):
+        monkeypatch.setattr(s, name, "")
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: pytest.fail("must not call out when unconfigured"))
+    d = B.decide(STATE, brain)
+    assert d.action == "buy" and d.reason.startswith(B.FALLBACK_TAG)
+
+
+def test_http_error_falls_back_with_tag(configured, monkeypatch):
     def down(*a, **k):
         raise B.httpx.ConnectError("no internet")
-    monkeypatch.setattr(B, "provider", lambda: "openai_compat")
     monkeypatch.setattr(B.httpx, "post", down)
-    assert B.decide(STATE).action == "buy"
+    d = B.decide(STATE, "gemini")
+    assert d.action == "buy" and d.reason.startswith(B.FALLBACK_TAG)
+
+
+def test_bad_status_falls_back(configured, monkeypatch):
+    class Bad(FakeHttp):
+        def raise_for_status(self):
+            raise B.httpx.HTTPStatusError("429", request=None, response=None)
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: Bad(HOLD))
+    assert B.decide(STATE, "gemma").reason.startswith(B.FALLBACK_TAG)
+
+
+@pytest.mark.parametrize("garbage", ["buy everything!!!", "{not json", '{"action":"moon","reason":"?"}'])
+def test_garbage_reply_falls_back(configured, monkeypatch, garbage):
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp(garbage))
+    assert B.decide(STATE, "local").reason.startswith(B.FALLBACK_TAG)
+
+
+def test_reply_without_choices_falls_back(configured, monkeypatch):
+    class Empty(FakeHttp):
+        def json(self):
+            return {"error": "quota"}
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: Empty(HOLD))
+    assert B.decide(STATE, "gemini").reason.startswith(B.FALLBACK_TAG)
+
+
+def test_code_fenced_json_is_accepted(configured, monkeypatch):
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp("```json\n" + HOLD + "\n```"))
+    assert B.decide(STATE, "gemini").reason == "calm"
+
+
+def test_ai_answer_is_still_clamped(configured, monkeypatch):
+    big = '{"action":"buy","amount_usd":999000000,"reason":"all in"}'
+    monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp(big))
+    assert B.decide(STATE, "gemini").amount_usd == STATE["max_trade_usd"]
+
+
+def test_available_brains_reports_only_true_false(configured):
+    avail = B.available_brains()
+    assert avail == {"rule": True, "claude": True, "gemini": True, "gemma": True, "local": True}
+    assert all(isinstance(v, bool) for v in avail.values())
+
+
+def test_rule_is_always_available_even_with_nothing_set(monkeypatch):
+    s = B.get_settings()
+    for name in ("anthropic_api_key", "gemini_api_key", "gemini_model", "local_llm_model"):
+        monkeypatch.setattr(s, name, "")
+    avail = B.available_brains()
+    assert avail["rule"] and not avail["claude"] and not avail["gemini"] and not avail["local"]

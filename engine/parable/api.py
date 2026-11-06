@@ -18,7 +18,8 @@ from pydantic import BaseModel
 from parable import world_pass
 from parable.config import get_settings
 from parable.launcher import ApprovalDenied, ApprovalPending, Launcher, LaunchError, real_backends, to_bytes32
-from parable.models import BotRules
+from parable.bot_runner import available_brains
+from parable.models import Brain, BotRules
 
 STATIC = Path(__file__).parent / "static"
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
@@ -69,6 +70,7 @@ class LaunchRequest(BaseModel):
     max_trade_usd: int = 20_000_000  # $20 per trade
     max_loss_bps: int = 1000  # 10% (1 bps = 0.01%)
     lease_seconds: int = 3600
+    brain: Brain = "rule"  # an unknown name is rejected with 422 by the model
 
 
 def vault_call(fn, *args):
@@ -87,8 +89,16 @@ def info():
     return {"offline": offline(), "explorer": EXPLORER_TX}
 
 
+@app.get("/api/brains")
+def brains():
+    """Which brains are set up on this server (true/false only; no keys or settings are ever returned)."""
+    return [{"brain": name, "available": ok} for name, ok in available_brains().items()]
+
+
 @app.post("/api/launch")
 def launch(req: LaunchRequest):
+    if not available_brains()[req.brain]:  # a quiet fallback would spoil the brain comparison, so refuse
+        raise HTTPException(400, f"brain '{req.brain}' is not set up on this server")
     pending_id, claim = get_launcher().start_launch(BotRules(**req.model_dump()))
     # the claim token stays in the requester's browser; only they can confirm this launch
     return {"pending_id": pending_id, "claim": claim,
@@ -125,14 +135,15 @@ def list_bots(creator: str | None = None, status: str | None = None):
 @app.get("/api/graveyard/{creator_id}")
 def graveyard(creator_id: str):
     lau = get_launcher()
-    names = {b.bot_id: b.ens_name for b in lau.b.arkiv.bots(creator_id, None)}
-    return [{**d.model_dump(), "ens_name": names.get(d.bot_id, f"bot #{d.bot_id}"), "tx_url": tx_url(d.tx_hash)}
+    bots = {b.bot_id: b for b in lau.b.arkiv.bots(creator_id, None)}
+    return [{**d.model_dump(), "ens_name": bots[d.bot_id].ens_name if d.bot_id in bots else f"bot #{d.bot_id}",
+             "brain": bots[d.bot_id].rules.brain if d.bot_id in bots else "unknown", "tx_url": tx_url(d.tx_hash)}
             for d in lau.b.arkiv.graveyard(creator_id)]
 
 
 @app.get("/api/report")
-def report(creator: str | None = None, strategy: str | None = None):
-    return get_launcher().report(creator or None, strategy or None)
+def report(creator: str | None = None, strategy: str | None = None, brain: str | None = None):
+    return get_launcher().report(creator or None, strategy or None, brain or None)
 
 
 @app.post("/api/bots/{bot_id}/{action}")

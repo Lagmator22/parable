@@ -8,12 +8,16 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+Brain = Literal["rule", "claude", "gemini", "gemma", "local"]  # who makes the bot's trading decisions
+
+
 class BotRules(BaseModel):
     strategy: str
     start_cash_usd: int
     max_trade_usd: int
     max_loss_bps: int
     lease_seconds: int
+    brain: Brain = "rule"  # old records without a brain count as the free rule
 
 
 class TradeDecision(BaseModel):

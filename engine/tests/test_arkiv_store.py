@@ -140,3 +140,20 @@ def test_bridge_down_raises_arkiv_error():
     store = A.ArkivStore(A.Bridge("http://127.0.0.1:1"))
     with pytest.raises(A.ArkivError):
         store.bots()
+
+
+def test_brain_is_stored_and_report_card_filters_by_brain(setup):
+    bridge, store = setup
+    for bot_id, brain in [(1, "rule"), (2, "gemini"), (3, "gemini")]:
+        rules = BotRules(strategy="momentum", start_cash_usd=100, max_trade_usd=10, max_loss_bps=500,
+                         lease_seconds=60, brain=brain)
+        store.put_bot(make_bot(bot_id).model_copy(update={"rules": rules}), 900)
+    store.put_death(make_death(2, pnl=-900))
+    store.put_death(make_death(1, pnl=500))
+    assert {r["attributes"]["brain"] for r in bridge.rows if r["schema"] == A.DEATH} == {"rule", "gemini"}
+    card = store.report_card(brain="gemini")
+    assert (card.launched, card.dead, card.profitable, card.worst_pnl_bps) == (2, 1, 0, -900)
+    assert card.subject == "brain:gemini"
+    assert store.report_card(brain="rule").profitable == 1
+    assert store.report_card().launched == 3  # no filter = everyone
+    assert store.report_card(brain="gemma").launched == 0

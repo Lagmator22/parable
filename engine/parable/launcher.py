@@ -207,7 +207,7 @@ class Launcher:
                             start_cash_usd=r.rules.start_cash_usd,
                             pnl_bps=(final - r.rules.start_cash_usd) * 10000 // r.rules.start_cash_usd,
                             lifetime_s=died_at - r.born_at, tx_hash=tx_hash or "")
-        self.b.arkiv.put_death(death, creator_id=r.creator_id, strategy=r.strategy)
+        self.b.arkiv.put_death(death, creator_id=r.creator_id, strategy=r.strategy, brain=r.rules.brain)
         self.b.arkiv.put_event(BotEvent(bot_id=r.bot_id, kind="death", at=died_at, tx_hash=tx_hash,
                                         data={"cause": cause, "pnl_bps": death.pnl_bps}))
         if self.b.ens.is_valid(r.ens_name, r.bot_address):  # the vault revokes its own oracle; also revoke the ENS name
@@ -222,9 +222,9 @@ class Launcher:
         threading.Thread(target=loop, daemon=True).start()
 
     # ---------------------------------------------------------------- read helpers
-    def report(self, creator_id: str | None, strategy: str | None):
-        card = self.b.arkiv.report_card(creator_id, strategy)
-        if creator_id:  # compare Arkiv's count with the vault's own count
+    def report(self, creator_id: str | None, strategy: str | None, brain: str | None = None):
+        card = self.b.arkiv.report_card(creator_id, strategy, brain=brain)
+        if creator_id and not brain:  # compare Arkiv's count with the vault's own count (it cannot split by brain)
             born, _dead = self.b.vault.counts(creator_id)
             card = card.model_copy(update={"vault_count_matches": card.launched == born})
         return card

@@ -1,4 +1,5 @@
 // Dashboard logic: talks to /api/* and redraws every 3 seconds. Plain JavaScript, no framework.
+let brains = [];  // every brain name, filled in at start
 const $ = (id) => document.getElementById(id);
 const usd = (n) => (n == null ? "?" : "$" + (n / 1e6).toFixed(2));
 const pct = (bps) => (bps == null ? "?" : (bps / 100).toFixed(1) + "%");
@@ -20,7 +21,7 @@ function creator() {
 function liveCard(b) {
   const minsLeft = Math.max(0, Math.round((b.born_at + b.rules.lease_seconds - Date.now() / 1000) / 60));
   return `<div class="card"><b>${esc(b.ens_name)}</b><br>
-    <span class="muted">${esc(b.strategy)} · ${minsLeft} min left</span><br>
+    <span class="muted">${esc(b.strategy)} · brain: ${esc(b.rules.brain)} · ${minsLeft} min left</span><br>
     Equity ${usd(b.equity_usd)} <span class="${cls(b.pnl_bps)}">${pct(b.pnl_bps)}</span><br>
     ${link(b.tx_url, "birth tx")}<br>
     <button class="small" onclick="act(${b.bot_id},'kill')">Kill</button>
@@ -30,6 +31,7 @@ function liveCard(b) {
 
 function tombstone(d) {
   return `<div class="card tomb">🪦<br><b>${esc(d.ens_name)}</b><br>
+    brain: ${esc(d.brain)}<br>
     lived ${Math.round(d.lifetime_s / 60)} min<br>
     <span class="${cls(d.pnl_bps)}">PnL ${pct(d.pnl_bps)}</span> (${usd(d.final_equity_usd)})<br>
     cause: ${esc(d.cause)}<br>${link(d.tx_url, "death tx")}</div>`;
@@ -41,7 +43,19 @@ function reportHtml(r) {
     worst loss <b class="bad">${pct(r.worst_pnl_bps)}</b><br>${match}`;
 }
 
+// One row per brain, using the same report card the API gives for a creator.
+async function compareBrains() {
+  const rows = [];
+  for (const b of brains) {
+    const r = (await api("/api/report?brain=" + b)).body;
+    rows.push(`<tr><td>${b}</td><td>${r.launched}</td><td>${r.dead}</td><td>${r.profitable}</td>
+      <td class="bad">${pct(r.worst_pnl_bps)}</td><td>${pct(r.avg_pnl_bps)}</td></tr>`);
+  }
+  $("compare").innerHTML = "<tr><th>brain</th><th>launched</th><th>dead</th><th>profitable</th><th>worst loss</th><th>avg PnL</th></tr>" + rows.join("");
+}
+
 async function refresh() {
+  compareBrains();
   const me = creator();
   const q = me ? `?creator=${encodeURIComponent(me)}` : "";
   const live = await api("/api/bots" + q + (q ? "&" : "?") + "status=alive");
@@ -67,9 +81,10 @@ async function act(id, action) {
 
 async function launch() {
   const num = (id) => Number($(id).value);
-  const rules = { strategy: $("strategy").value, start_cash_usd: num("cash") * 1e6, max_trade_usd: num("maxtrade") * 1e6,
+  const rules = { brain: $("brain").value, strategy: $("strategy").value, start_cash_usd: num("cash") * 1e6, max_trade_usd: num("maxtrade") * 1e6,
                   max_loss_bps: num("maxloss") * 100, lease_seconds: num("lease") * 60 };
   const res = await fetch("/api/launch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rules) });
+  if (!res.ok) { $("launch-msg").textContent = "No bot launched: " + (await res.json()).detail; return; }
   const { pending_id, claim, approve_url } = await res.json();
   window.open(approve_url, "_blank");  // the World ID approval page
   $("launch-msg").textContent = "Waiting for World ID approval in the new tab...";
@@ -103,6 +118,10 @@ async function start() {
   const info = (await api("/api/info")).body;
   $("banner").hidden = !info.offline;
   try { $("creator").value = localStorage.getItem("creator") || ""; } catch {}
+  // Only brains the server has set up can be picked (the rule is always there).
+  const list = (await api("/api/brains")).body;
+  brains = list.map((b) => b.brain);
+  $("brain").innerHTML = list.filter((b) => b.available).map((b) => `<option>${b.brain}</option>`).join("");
   $("launch").onclick = launch;
   document.querySelectorAll("button.cheat[data-url]").forEach((b) => (b.onclick = () => cheat(b.dataset.url)));
   $("overlimit").onclick = async () => {
