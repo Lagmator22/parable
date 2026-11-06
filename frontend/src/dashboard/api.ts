@@ -60,7 +60,7 @@ export const brainName = (value: string): string => {
   const words = model.replace(/-it$/, '').split('-').map(w => /^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1));
   const out: string[] = [];
   words.forEach(w => { const prev = out[out.length - 1]; if (prev && /^\d+$/.test(prev) && /^\d+$/.test(w)) out[out.length - 1] = `${prev}.${w}`; else out.push(w); });
-  return out.join(' ').replace(/Flash Lite/, 'Flash-Lite').replace(/ (\d+)b\b/i, ' $1B').replace(/ A\d+b\b/i, '');
+  return out.join(' ').replace(/Flash Lite/, 'Flash-Lite').replace(/Deepseek/, 'DeepSeek').replace(/ (\d+)b\b/i, ' $1B').replace(/ A\d+b\b/i, '');
 };
 export const causeName = (value: string) => ({ expired: 'Its time ran out', killed: 'Stopped by its creator', loss_limit: 'Lost too much, the vault ended it' })[value as 'expired' | 'killed' | 'loss_limit'] || value;
 // What each vault refusal means, in one plain sentence.

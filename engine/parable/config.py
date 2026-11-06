@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     claude_models: str = "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5"
     # Jev (Autoloops): the model scores buy/sell/hold and returns probabilities. Key from autoloops.ai/console.
     autoloops_api_key: str = ""
-    jev_models: str = "gemma-4-31b-it"
+    jev_models: str = "gemma-4-31b-it,deepseek-v4.1-flash"
     # Other bot brains (a bot picks one at launch). Gemini and Gemma share one Google key.
     gemini_api_key: str = ""
     # Comma-separated model lists: every model becomes its own brain ("gemini:<model>", "gemma:<model>").
