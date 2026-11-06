@@ -23,3 +23,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: Codex replaced native strategy and brain selects with theme-aware keyboard menus, made the three history rows navigate to their matching sections with a subtle pointer highlight, and made Back to top jump immediately. Added a keyboard selection test and checked the controls in Chrome. User review pending.
 
 - 2026-11-06: Codex documented the Vercel frontend deployment and backend proxy requirements. The project is not deployed to Vercel yet because the backend has no stable public URL configured. User review pending.
+
+- 2026-11-06: Codex changed the illustrated history and section numbers to circles, aligned the launch panel with the other sections, reduced excess section spacing, separated Arkiv error and empty states, and replaced the empty comparison table with one clear message. Constrained scramble text to its label box so hover glyphs stay inside buttons. Checked the changed sections in Chrome. User review pending.
