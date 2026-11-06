@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from parable import vault
 from parable.config import get_settings
+from parable.jev import jev_decide
 from parable.minds import claude_usable, note_claude_error
 from parable.models import BotRules, TradeDecision
 
@@ -185,6 +186,8 @@ def build_brains() -> dict[str, dict]:
     for model in [m.strip() for m in s.claude_models.split(",") if m.strip()]:
         brains[f"claude:{model}"] = {"decide": lambda st, model=model: claude_decide(st, model),
                                      "ready": bool(s.anthropic_api_key) and claude_usable()}
+    for model in [m.strip() for m in s.jev_models.split(",") if m.strip()]:
+        brains[f"jev:{model}"] = {"decide": lambda st, model=model: jev_decide(st, model), "ready": bool(s.autoloops_api_key)}
     for family, models in (("gemini", s.gemini_models), ("gemma", s.gemma_models)):
         for model in [m.strip() for m in models.split(",") if m.strip()]:
             brains[f"{family}:{model}"] = {

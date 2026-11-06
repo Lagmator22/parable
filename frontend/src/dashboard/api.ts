@@ -52,9 +52,10 @@ export const pct = (value: number | null | undefined) => {
 /** 'up' or 'down' for coloring a return; tiny moves that show as 0.0% get no color. */
 export const trend = (bps: number | null | undefined) => Math.round((bps || 0) / 10) > 0 ? 'up' : Math.round((bps || 0) / 10) < 0 ? 'down' : '';
 // "gemini:gemini-3.5-flash-lite" -> "Gemini 3.5 Flash-Lite", "claude:claude-opus-5-5" -> "Claude Opus 5.5".
-export const brainName = (value: string) => {
+export const brainName = (value: string): string => {
   if (value === 'rule') return 'Simple rule (no AI)';
   if (value === 'unknown') return 'not recorded';
+  if (value.startsWith('jev:')) return `Jev · ${brainName(value.slice(4))}`;  // Jev scores buy/sell/hold instead of writing text
   const model = value.includes(':') ? value.split(':')[1] : value;
   const words = model.replace(/-it$/, '').split('-').map(w => /^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1));
   const out: string[] = [];

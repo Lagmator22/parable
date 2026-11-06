@@ -150,7 +150,7 @@ def configured(monkeypatch):
     """Every brain is set up, with fake keys and models; returns the list of HTTP calls the brains make."""
     s = B.get_settings()
     for name, value in dict(anthropic_api_key="k-claude", gemini_api_key="k-google", gemini_models="gem-a, gem-b",
-                            gemma_models="gemma-x", local_llm_base_url="http://local:1/v1",
+                            gemma_models="gemma-x", local_llm_base_url="http://local:1/v1", autoloops_api_key="k-jev", jev_models="jev-x",
                             local_llm_model="llama-x").items():
         monkeypatch.setattr(s, name, value)
     calls = []
@@ -248,14 +248,15 @@ def test_ai_answer_is_still_clamped(configured, monkeypatch):
 def test_available_brains_reports_only_true_false(configured):
     avail = B.available_brains()
     assert avail == {"rule": True, "claude:claude-haiku-5-5": True, "claude:claude-sonnet-5-5": True,
-                     "claude:claude-opus-5-5": True, "gemini:gem-a": True, "gemini:gem-b": True, "gemma:gemma-x": True}
+                     "claude:claude-opus-5-5": True, "jev:jev-x": True, "gemini:gem-a": True, "gemini:gem-b": True,
+                     "gemma:gemma-x": True}
     assert "local" not in avail  # running a model on this laptop is not offered
     assert all(isinstance(v, bool) for v in avail.values())
 
 
 def test_rule_is_always_available_even_with_nothing_set(monkeypatch):
     s = B.get_settings()
-    for name in ("anthropic_api_key", "gemini_api_key", "gemini_models", "gemma_models", "local_llm_model"):
+    for name in ("anthropic_api_key", "gemini_api_key", "gemini_models", "gemma_models", "local_llm_model", "autoloops_api_key", "jev_models"):
         monkeypatch.setattr(s, name, "")
     assert B.available_brains() == {"rule": True, "claude:claude-haiku-5-5": False, "claude:claude-sonnet-5-5": False,
                                     "claude:claude-opus-5-5": False}

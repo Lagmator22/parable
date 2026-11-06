@@ -45,7 +45,7 @@ export function Launch({ info, brains, onBorn }: Props) {
   const options = (f: Field): Option[] => {
     if (f === 'strategy') return (info?.strategies || ['momentum', 'dip_buyer', 'yolo']).map(s => ({ value: s, label: s.replace('_', ' '), note: STRATEGY_NOTES[s] || '' }));
     if (f === 'brain') return brains.map(b => ({ value: b.brain, label: brainName(b.brain), off: !b.available,
-      note: !b.available ? (b.brain.startsWith('claude') ? 'not set up: needs API credit' : 'not set up') : b.brain === 'rule' ? 'no AI, never fails' : b.brain.split(':')[0] }));
+      note: !b.available ? (b.brain.startsWith('claude') ? 'not set up: needs API credit' : b.brain.startsWith('jev') ? 'not set up: needs an Autoloops key' : 'not set up') : b.brain === 'rule' ? 'no AI, never fails' : b.brain.startsWith('jev') ? 'scores buy/sell/hold, very fast' : b.brain.split(':')[0] }));
     const n = NUMBERS[f];
     return n.values.map(x => ({ value: x, label: n.show(x), note: n.note(x) }));
   };

@@ -29,4 +29,5 @@ test('model ids read as product names', () => {
   expect(brainName('gemma:gemma-4-26b-a4b-it')).toBe('Gemma 4 26B');
   expect(brainName('gemma:gemma-4-31b-it')).toBe('Gemma 4 31B');
   expect(brainName('rule')).toBe('Simple rule (no AI)');
+  expect(brainName('jev:gemma-4-31b-it')).toBe('Jev · Gemma 4 31B');
 });

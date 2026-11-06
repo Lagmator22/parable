@@ -83,6 +83,7 @@ def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
     monkeypatch.setattr(s, "gemini_models", "gem-model,gem-two")
     monkeypatch.setattr(s, "gemma_models", "")
     monkeypatch.setattr(s, "local_llm_model", "")
+    monkeypatch.setattr(s, "jev_models", "")
     c, _, _ = client
     r = c.get("/api/brains")
     assert "SECRET" not in r.text
