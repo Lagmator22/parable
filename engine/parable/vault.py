@@ -19,9 +19,19 @@ CAUSE = ["none", "expired", "killed", "loss_limit"]
 RECEIPT_TIMEOUT_S = 120
 
 
+def make_w3(url: str) -> Web3:
+    """A Sepolia connection that retries with backoff when the free RPC is busy (HTTP 429) or drops a request."""
+    import requests
+    from web3.providers.rpc.utils import ExceptionRetryConfiguration
+
+    retry = ExceptionRetryConfiguration(errors=(requests.exceptions.ConnectionError, requests.exceptions.HTTPError,
+                                                requests.exceptions.Timeout), retries=5, backoff_factor=0.5)
+    return Web3(Web3.HTTPProvider(url, request_kwargs={"timeout": 30}, exception_retry_configuration=retry))
+
+
 @lru_cache
 def _w3() -> Web3:
-    return Web3(Web3.HTTPProvider(get_settings().sepolia_rpc_url, request_kwargs={"timeout": 30}))
+    return make_w3(get_settings().sepolia_rpc_url)
 
 
 @lru_cache

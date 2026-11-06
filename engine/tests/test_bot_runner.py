@@ -102,6 +102,26 @@ def test_loop_reports_traded_and_rejected(monkeypatch):
     assert events == ["traded", "rejected"]
 
 
+def test_a_busy_rpc_is_never_reported_as_a_vault_refusal(monkeypatch):
+    alive = {"status": "alive", "expiresAt": 2**40, "cashUsd": 50_000_000, "ethWei": 0,
+             "maxTradeUsd": 10_000_000, "maxLossBps": 500}
+    monkeypatch.setattr(B.vault, "get_bot", lambda i: alive)
+    monkeypatch.setattr(B.vault, "price", lambda: PRICE)
+    monkeypatch.setattr(B.vault, "equity", lambda i: 50_000_000)
+    stop, events = Event(), []
+
+    def busy(*a):
+        raise Exception("429 Client Error: Too Many Requests")
+
+    def report(kind, data):
+        events.append(kind)
+        stop.set()
+    monkeypatch.setattr(B.vault, "trade", busy)
+    monkeypatch.setattr(B.vault, "decode_revert", lambda e: "UnknownError")
+    B.run_bot(1, "key", RULES, stop, report, interval_s=0)
+    assert events == ["error"]  # skipped turn, not "rejected": the vault never said no
+
+
 # ---------------------------------------------------------------- choosing the brain (edge cases)
 
 def test_claude_is_not_forced_to_use_the_tool(monkeypatch):

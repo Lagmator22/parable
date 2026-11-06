@@ -121,7 +121,9 @@ def classify(state: tuple, now: int) -> tuple[bool, str]:
 class EnsBadge:
     def __init__(self, settings: Settings | None = None, w3: Web3 | None = None):
         self.s = settings or get_settings()
-        self.w3 = w3 or Web3(Web3.HTTPProvider(self.s.sepolia_rpc_url, request_kwargs={"timeout": 30}))
+        from parable.vault import make_w3  # same retrying Sepolia connection as the vault client
+
+        self.w3 = w3 or make_w3(self.s.sepolia_rpc_url)
         key = self.s.operator_private_key
         self._account = Account.from_key(key) if key else None
 

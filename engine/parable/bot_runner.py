@@ -262,8 +262,13 @@ def run_bot(bot_id: int, bot_key: str, rules: BotRules, stop_event: Event,
                                   "reason": decision.reason, "tx": tx})
         except Exception as err:  # a failed trade must not crash the loop
             reason = vault.decode_revert(err)
-            if reason == "UnknownError":
-                log.warning("bot %s trade failed: %s", bot_id, redact(err))  # server log only, URLs removed
+            if reason in ("UnknownError", "BotOutOfGas"):
+                # Not a vault rule (the vault names every refusal): a network hiccup, a busy RPC, or no fee money.
+                # Never show it as "the vault said no"; skip this turn and note it in the server log only.
+                log.warning("bot %s turn skipped: %s", bot_id, redact(err))
+                report("error", {"reason": reason})
+                stop_event.wait(interval_s)
+                continue
             report("rejected", {"reason": reason})
             if reason in DEAD_REASONS:
                 report("stopped", {"reason": reason})
