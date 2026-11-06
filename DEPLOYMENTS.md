@@ -21,3 +21,11 @@ Deployed 2026-11-06 14:19 IST with `contracts/script/Deploy.s.sol` (MAX_PRICE_AG
 [write records](https://sepolia.etherscan.io/tx/0x6bbc664fea34da2dae01cbfc58d916b6c1c0269268808cf19135ecae6821a919) ·
 [bind to vault's checker](https://sepolia.etherscan.io/tx/0x443c1073dc13a73812485b314f176dd7cef52117ac08bc08d2911965c15de388) ·
 [revoke (burn)](https://sepolia.etherscan.io/tx/0x02204e998f0735ae4e2bcbde6eb78d1d48fd840f9731b4042f5df3f96ad8609b)
+
+## Arkiv (Rabdi testnet, chain id 7794095)
+Writer wallet (same as the operator): [`0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570`](https://rabdi.explorer.arkiv.network/address/0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570)
+
+**Live proof (2026-11-06):** wrote a bot, a birth and a death, then read the graveyard and report card back:
+[bot](https://rabdi.explorer.arkiv.network/tx/0x19865c864b2dce647f6c3041afdec6c178a3848cf9a0dfaf08f57f1f06a45fb3) ·
+[birth](https://rabdi.explorer.arkiv.network/tx/0x98b24330b21fb990bcee3a1d5dab8916cb9a16fe95cb1a132efed5adebe89615) ·
+[death](https://rabdi.explorer.arkiv.network/tx/0xc5714abb242c6d3eddc8a79272097f1febe88886dbe8fd7239dfdd6c8b150f15)

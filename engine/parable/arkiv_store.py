@@ -8,7 +8,6 @@ wallet, and if we do not know that wallet we refuse to read at all (fail closed)
 
 from __future__ import annotations
 
-import os
 
 import httpx
 
@@ -31,7 +30,7 @@ class Bridge:
 
     def __init__(self, url: str, token: str = ""):
         self.url = url.rstrip("/")
-        self.token = token or os.environ.get("ARKIV_BRIDGE_TOKEN", "")  # shared password with the bridge
+        self.token = token or get_settings().arkiv_bridge_token  # shared password with the bridge (from .env)
 
     def call(self, method: str, path: str, payload: dict | None = None):
         try:
@@ -194,7 +193,7 @@ def default_store() -> ArkivStore:
     global _store
     if _store is None:
         s = get_settings()
-        _store = ArkivStore(Bridge(os.environ.get("ARKIV_BRIDGE_URL", "http://127.0.0.1:8787")), writer=s.arkiv_writer_address)
+        _store = ArkivStore(Bridge(s.arkiv_bridge_url), writer=s.arkiv_writer_address)
     return _store
 
 

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Optional, read-only deployments: the writer wallet whose records we trust.
     # Derived from arkiv_private_key when that is set.
     arkiv_writer_address: str = ""
+    # The local arkiv-bridge helper: where it listens and the shared password it requires (both from .env).
+    arkiv_bridge_url: str = "http://127.0.0.1:8787"
+    arkiv_bridge_token: str = ""
     world_client_id: str = ""
     world_client_secret: str = ""
     world_mock: bool = False

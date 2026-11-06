@@ -157,3 +157,11 @@ def test_brain_is_stored_and_report_card_filters_by_brain(setup):
     assert store.report_card(brain="rule").profitable == 1
     assert store.report_card().launched == 3  # no filter = everyone
     assert store.report_card(brain="gemma").launched == 0
+
+
+def test_bridge_token_comes_from_settings_not_shell(monkeypatch):
+    """The bridge reads its password from .env, so the Python side must too (bug found in the first live run)."""
+    from parable import arkiv_store as A
+    monkeypatch.delenv("ARKIV_BRIDGE_TOKEN", raising=False)
+    monkeypatch.setattr(A, "get_settings", lambda: type("S", (), {"arkiv_bridge_token": "from-dotenv-123456"})())
+    assert A.Bridge("http://127.0.0.1:1").token == "from-dotenv-123456"
