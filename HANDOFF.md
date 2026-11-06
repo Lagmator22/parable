@@ -1,3 +1,21 @@
+# HANDOFF: CURRENT STATE (Fri 6 Nov 2026, ~21:00 IST, after commit fe419ee). Read this section first.
+
+**Built and pushed since the older notes below:**
+- Bot gas top-ups were failing on-chain (21000 gas limit) so no bot could trade. Fixed (100k limit). First real AI trade: bot 5 (Gemini) bought $20 of ETH on Sepolia.
+- Website rebuilt in a "public register" style (black/white, square edges, Archivo + IBM Plex Mono, orange only for death/refusal, blinking squares for running things). Designed first on a Claude Design canvas (private link in chat).
+- Sections: hero (Born/Dead counts, latest deaths) · 01 Launch (one sentence; click a word, pick from the tray) · 02 Running · 03 Register (dead names struck through) · 04 Try to cheat (black band) · 05 Swarm · 06 Benchmarks · How it works. Plus a **Telemetry** panel that slides down from the top bar (12 numbers, 3 live charts, agent table, event feed, "check it yourself" links + copy commands, both commands tested).
+- Brains: `rule`, `claude:<model>` (Haiku/Sonnet/Opus 5.5), `gemini:<model>`, `gemma:<model>`. `local` removed. Claude shows "not set up" while the Anthropic account has no credit (probe at server start, `engine/parable/minds.py`). **No credit yet** (tested: "credit balance is too low").
+- Swarm v2 (`engine/parable/manager.py`, routes in `swarm_api.py`): pick mind + worker brains, ONE World ID approval launches all workers on Sepolia, mind checks every 60 s, safety rule (−3% or 2 refusals) overrides it, live status. Race condition found by security review: fixed + test.
+- Live graph recorder (`engine/parable/series.py`): every 10 s, each bot's vault value AND its holdings at the live Coinbase price; ETH market vs Chainlink. In memory only.
+- Launch progress shows the server's REAL steps ("step N/6 done"), never a timer.
+- Tests: **153 Python + 39 Foundry + 8 frontend** pass. API contract: `docs/FRONTEND_CONTRACT.md` (bottom section has swarm + series routes).
+
+**Decisions locked with the user:** practice money on Sepolia only; the register is ALWAYS public (future work: choose public/private at birth, never after results); "real platform" = roadmap line "next, the vault swaps on Uniswap itself" (a centralized exchange would break the guarantee, do not promise it).
+
+**Still to do:** live run (1 bot + 1 swarm) by the user; Claude credit then server restart; a public deploy (see the user's chosen platform); README/ARCHITECTURE/video script updates; make repo public; record video; submit to ENS + Arkiv + World by 07:30 Sat.
+
+---
+
 # HANDOFF: read this first (updated Fri 6 Nov 2026, ~18:48 IST)
 
 You are auditing / taking over **Parable**, a solo ETHGlobal Mumbai 2026 project.
