@@ -87,7 +87,8 @@ def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
     r = c.get("/api/brains")
     assert "SECRET" not in r.text
     found = {b["brain"]: b["available"] for b in r.json()}
-    assert found == {"rule": True, "claude": True, "local": False, "gemini:gem-model": True, "gemini:gem-two": True}
+    assert found == {"rule": True, "claude:claude-haiku-5-5": True, "claude:claude-sonnet-5-5": True,
+                     "claude:claude-opus-5-5": True, "gemini:gem-model": True, "gemini:gem-two": True}
 
 
 def test_launch_with_unconfigured_brain_is_rejected(client, monkeypatch):
@@ -201,23 +202,44 @@ def test_code_fingerprint_default_creator_and_all_graveyard(client):
     assert c.post("/api/cheat/second-identity").json()["reason"] == "CreatorIdentityMismatch"
 
 
-def test_swarm_manager_and_mcp_tools(client):
-    from parable import mcp_server
-    from parable.models import BotEvent
+def test_swarm_manager_and_mcp_tools(client, monkeypatch):
+    from parable import manager as M
+    from parable import mcp_server, swarm_api
 
     c, world, lau = client
     bot = launch(c, world)
-    # Record a rejected trade so the swarm manager flags the bot.
-    lau.b.arkiv.put_event(BotEvent(bot_id=bot["bot_id"], kind="rejected", at=int(time.time()),
-                                   data={"reason": "OverTradeLimit"}))
-    st = c.get("/api/manager").json()
-    assert st["enabled"] is True
-    ran = c.post("/api/manager/start", json={"bots": 2, "minutes": 10}).json()
-    actions = {d["action"] for d in ran["decisions"]}
-    assert "flag" in actions and "keep" in actions
+    s = api.get_settings()
+    monkeypatch.setattr(s, "gemini_api_key", "k")
+    monkeypatch.setattr(s, "gemini_models", "gem-mind")
+    # The mind must be an AI and must be set up; unknown or plain-rule minds are refused.
+    assert c.post("/api/swarm/start", json={"mind": "rule", "workers": ["rule"]}).status_code == 400
+    assert c.post("/api/swarm/start", json={"mind": "gemini:nope", "workers": ["rule"]}).status_code == 400
+    started = c.post("/api/swarm/start", json={"mind": "gemini:gem-mind", "workers": ["rule"], "bots": 2, "minutes": 5}).json()
+    pid, claim = started["pending_id"], started["claim"]
+    assert c.post(f"/api/swarm/{pid}/confirm", headers={"x-claim": claim}).status_code == 409  # not approved yet
+    assert c.post(f"/api/swarm/{pid}/confirm", headers={"x-claim": "stranger"}).status_code == 404
+    world.decide(pid, True)
+    st = c.post(f"/api/swarm/{pid}/confirm", headers={"x-claim": claim}).json()
+    assert st["phase"] in ("launching", "running") and st["plan"]["mind"] == "gemini:gem-mind"
+    mgr = swarm_api.get_manager()
+    for _ in range(100):
+        if mgr.phase == "running":
+            break
+        time.sleep(0.02)
+    assert mgr.phase == "running" and len(mgr.bot_ids) == 2
+    # The mind says stop for one bot and keep for the other; the stopped one lands in the graveyard.
+    answers = iter([{"action": "stop", "reason": "weak"}, {"action": "keep", "reason": "fine"}])
+    monkeypatch.setattr(M, "chat_json", lambda brain, prompt: next(answers))
+    mgr.check_once()
+    acts = [d["action"] for d in c.get("/api/swarm").json()["decisions"]]
+    assert acts[:2] == ["keep", "stop"] and acts.count("launch") == 2
+    assert lau.live[mgr.bot_ids[0]].dead and not lau.live[mgr.bot_ids[1]].dead
+    # Only the starter can stop the mind.
+    assert c.post("/api/swarm/stop", headers={"x-claim": "stranger"}).status_code == 403
+    assert c.post("/api/swarm/stop", headers={"x-claim": claim}).json()["phase"] == "done"
     # Verify MCP tools work against the same engine state.
     assert mcp_server.list_bots()[0]["bot_id"] == bot["bot_id"]
-    assert mcp_server.report_card(creator_id=bot["creator_id"])["launched"] == 1
+    assert mcp_server.report_card(creator_id=bot["creator_id"])["launched"] == 3  # 1 bot + 2 swarm workers, same person
     assert mcp_server.bot_events(bot["bot_id"])[0]["kind"] in ("birth", "rejected", "trade")
     assert len(mcp_server.compare_brains()) >= 1
     # Verify ERC-8004 export + TUI scoreboard include living and dead agents.
@@ -245,3 +267,51 @@ def test_all_graves_view_lists_every_creator(client):
     c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
     graves = c.get("/api/graveyard/all")
     assert graves.status_code == 200 and graves.json()[0]["bot_id"] == bot["bot_id"]
+
+
+def test_swarm_safety_rule_stops_a_refused_bot_even_if_the_mind_is_down(client, monkeypatch):
+    from parable import manager as M
+    from parable.models import BotEvent
+
+    c, world, lau = client
+    mgr = M.SwarmManager(lau)
+    monkeypatch.setattr(M, "available_brains", lambda: {"rule": True, "gemini:m": True})
+    pid, claim = mgr.start("gemini:m", ["rule"], 1, 5)
+    world.decide(pid, True)
+    mgr.confirm(pid, claim)
+    for _ in range(100):
+        if mgr.bot_ids:
+            break
+        time.sleep(0.02)
+    bot_id = mgr.bot_ids[0]
+    for _ in range(2):
+        lau.b.arkiv.put_event(BotEvent(bot_id=bot_id, kind="rejected", at=int(time.time()), data={"reason": "OverTradeLimit"}))
+    monkeypatch.setattr(M, "chat_json", lambda *a: (_ for _ in ()).throw(RuntimeError("mind down")))
+    mgr.check_once()
+    assert lau.live[bot_id].dead and mgr.decisions[0].by == "safety rule"
+    mgr.stop_event.set()
+
+
+def test_graph_series_records_vault_and_market_values(client):
+    from parable.series import Recorder
+
+    c, world, lau = client
+    bot = launch(c, world)
+    rec = Recorder(lau, price_source=lambda: 3000.0)
+    rec.sample()
+    data = rec.to_dict()
+    assert data["prices"][0][1] == 3000.0
+    row = next(r for r in data["bots"] if r["bot_id"] == bot["bot_id"])
+    assert row["status"] == "alive" and len(row["points"]) == 1 and len(row["points"][0]) == 3
+    assert c.get("/api/series").status_code == 200
+
+
+def test_graph_series_survives_no_market_price(client):
+    from parable.series import Recorder
+
+    c, world, lau = client
+    launch(c, world)
+    rec = Recorder(lau, price_source=lambda: None)
+    rec.sample()  # must not raise; the market value falls back to the vault value
+    point = rec.to_dict()["bots"][0]["points"][0]
+    assert point[1] == point[2]

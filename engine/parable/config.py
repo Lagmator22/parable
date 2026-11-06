@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     world_mock: bool = False
     anthropic_api_key: str = ""
     bot_model: str = "claude-haiku-5-5"
+    # Every Claude model listed here becomes its own brain ("claude:<model>"), like the Gemini list.
+    claude_models: str = "claude-haiku-5-5,claude-sonnet-5-5,claude-opus-5-5"
     # Other bot brains (a bot picks one at launch). Gemini and Gemma share one Google key.
     gemini_api_key: str = ""
     # Comma-separated model lists: every model becomes its own brain ("gemini:<model>", "gemma:<model>").

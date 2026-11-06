@@ -33,11 +33,11 @@ def test_clamp_sell_with_no_eth_becomes_hold():
 
 
 def test_llm_failure_falls_back_to_rule(monkeypatch):
-    def boom(state):
+    def boom(state, model=None):
         raise TimeoutError("slow")
     monkeypatch.setattr(B, "claude_decide", boom)
     monkeypatch.setattr(B.get_settings(), "anthropic_api_key", "k")
-    d = B.decide(STATE, "claude")  # rising price -> momentum buys
+    d = B.decide(STATE, "claude:claude-haiku-5-5")  # rising price -> momentum buys
     assert d.action == "buy" and d.amount_usd == 10_000_000
 
 
@@ -47,7 +47,7 @@ def test_invalid_llm_output_falls_back(monkeypatch):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
                 content=[SimpleNamespace(type="tool_use", input={"action": "moon", "reason": "?"})]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    assert B.decide(STATE, "claude").action == "buy"  # validation error -> rule
+    assert B.decide(STATE, "claude:claude-haiku-5-5").action == "buy"  # validation error -> rule
 
 
 def test_valid_llm_output_used(monkeypatch):
@@ -57,7 +57,7 @@ def test_valid_llm_output_used(monkeypatch):
                 content=[SimpleNamespace(type="tool_use",
                                          input={"action": "hold", "amount_dollars": 0, "reason": "wait"})]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    assert B.decide(STATE, "claude").action == "hold"
+    assert B.decide(STATE, "claude:claude-haiku-5-5").action == "hold"
 
 
 def test_yolo_trades_max():
@@ -81,9 +81,9 @@ def test_loop_reports_traded_and_rejected(monkeypatch):
     monkeypatch.setattr(B.vault, "get_bot", lambda i: alive)
     monkeypatch.setattr(B.vault, "price", lambda: PRICE)
     monkeypatch.setattr(B.vault, "equity", lambda i: 50_000_000)
-    monkeypatch.setattr(B, "claude_decide", lambda s: TradeDecision(action="buy", amount_usd=1_000_000, reason="t"))
+    monkeypatch.setattr(B, "claude_decide", lambda s, m=None: TradeDecision(action="buy", amount_usd=1_000_000, reason="t"))
     monkeypatch.setattr(B.get_settings(), "anthropic_api_key", "k")
-    rules = RULES.model_copy(update={"brain": "claude"})
+    rules = RULES.model_copy(update={"brain": "claude:claude-haiku-5-5"})
     stop, events, calls = Event(), [], []
 
     def fake_trade(key, bot_id, buy, amount):
@@ -126,7 +126,7 @@ def test_claude_reply_without_tool_call_falls_back(monkeypatch):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
                 content=[SimpleNamespace(type="text", text="I think you should buy")]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    assert B.decide(STATE, "claude").action == "buy"  # no tool call -> rule
+    assert B.decide(STATE, "claude:claude-haiku-5-5").action == "buy"  # no tool call -> rule
 
 
 # ---------------------------------------------------------------- the brain registry
@@ -175,7 +175,6 @@ def test_rule_brain_never_calls_any_ai(monkeypatch):
     ("gemini:gem-a", B.GOOGLE_BASE + "/chat/completions", "gem-a", "k-google"),
     ("gemini:gem-b", B.GOOGLE_BASE + "/chat/completions", "gem-b", "k-google"),
     ("gemma:gemma-x", B.GOOGLE_BASE + "/chat/completions", "gemma-x", "k-google"),
-    ("local", "http://local:1/v1/chat/completions", "llama-x", None),
 ])
 def test_each_brain_calls_its_own_endpoint_and_model(configured, brain, url, model, key):
     assert B.decide(STATE, brain).action == "hold"
@@ -190,10 +189,10 @@ def test_claude_brain_uses_claude_not_http(configured, monkeypatch):
             self.messages = SimpleNamespace(create=lambda **k: SimpleNamespace(
                 content=[SimpleNamespace(type="tool_use", input={"action": "hold", "amount_dollars": 0, "reason": "c"})]))
     monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
-    assert B.decide(STATE, "claude").reason == "c" and configured == []
+    assert B.decide(STATE, "claude:claude-haiku-5-5").reason == "c" and configured == []
 
 
-@pytest.mark.parametrize("brain", ["claude", "gemini:gem-a", "gemma:gemma-x", "local", "gemini:not-listed"])
+@pytest.mark.parametrize("brain", ["claude:claude-haiku-5-5", "gemini:gem-a", "gemma:gemma-x", "local", "gemini:not-listed"])
 def test_unconfigured_brain_falls_back_with_tag(monkeypatch, brain):
     s = B.get_settings()
     for name in ("anthropic_api_key", "gemini_api_key", "local_llm_model"):
@@ -224,7 +223,7 @@ def test_bad_status_falls_back(configured, monkeypatch):
 @pytest.mark.parametrize("garbage", ["buy everything!!!", "{not json", '{"action":"moon","reason":"?"}'])
 def test_garbage_reply_falls_back(configured, monkeypatch, garbage):
     monkeypatch.setattr(B.httpx, "post", lambda *a, **k: FakeHttp(garbage))
-    assert B.decide(STATE, "local").reason.startswith(B.FALLBACK_TAG)
+    assert B.decide(STATE, "gemini:gem-a").reason.startswith(B.FALLBACK_TAG)
 
 
 def test_reply_without_choices_falls_back(configured, monkeypatch):
@@ -248,8 +247,9 @@ def test_ai_answer_is_still_clamped(configured, monkeypatch):
 
 def test_available_brains_reports_only_true_false(configured):
     avail = B.available_brains()
-    assert avail == {"rule": True, "claude": True, "local": True, "gemini:gem-a": True, "gemini:gem-b": True,
-                     "gemma:gemma-x": True}
+    assert avail == {"rule": True, "claude:claude-haiku-5-5": True, "claude:claude-sonnet-5-5": True,
+                     "claude:claude-opus-5-5": True, "gemini:gem-a": True, "gemini:gem-b": True, "gemma:gemma-x": True}
+    assert "local" not in avail  # running a model on this laptop is not offered
     assert all(isinstance(v, bool) for v in avail.values())
 
 
@@ -257,7 +257,23 @@ def test_rule_is_always_available_even_with_nothing_set(monkeypatch):
     s = B.get_settings()
     for name in ("anthropic_api_key", "gemini_api_key", "gemini_models", "gemma_models", "local_llm_model"):
         monkeypatch.setattr(s, name, "")
-    assert B.available_brains() == {"rule": True, "claude": False, "local": False}
+    assert B.available_brains() == {"rule": True, "claude:claude-haiku-5-5": False, "claude:claude-sonnet-5-5": False,
+                                    "claude:claude-opus-5-5": False}
+
+
+def test_each_claude_model_is_its_own_brain(configured, monkeypatch):
+    seen = []
+
+    class FakeClient:
+        def __init__(self, **kw):
+            def create(**k):
+                seen.append(k["model"])
+                return SimpleNamespace(content=[SimpleNamespace(type="tool_use", input={"action": "hold", "amount_dollars": 0, "reason": "c"})])
+            self.messages = SimpleNamespace(create=create)
+    monkeypatch.setattr(B.anthropic, "Anthropic", FakeClient)
+    B.decide(STATE, "claude:claude-opus-5-5")
+    B.decide(STATE, "claude:claude-sonnet-5-5")
+    assert seen == ["claude-opus-5-5", "claude-sonnet-5-5"]
 
 
 def test_google_models_without_a_key_are_listed_but_unavailable(monkeypatch):

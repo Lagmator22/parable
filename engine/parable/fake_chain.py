@@ -126,7 +126,8 @@ class FakeVault:
     def get_bot(self, bot_id: int) -> dict:
         b = self.bots[bot_id]
         cause = ["none", "expired", "killed", "loss_limit"][b["cause"] or 0]  # same names as vault.py
-        return {"status": b["status"], "cause": cause, "finalEquityUsd": b["final"], "diedAt": b["died_at"]}
+        return {"status": b["status"], "cause": cause, "finalEquityUsd": b["final"], "diedAt": b["died_at"],
+                "cashUsd": b["cash"], "ethWei": b["eth"]}
 
     def total_born(self) -> int:
         return len(self.bots)

@@ -1,4 +1,4 @@
-"""The trading bot's brain and loop. Each bot has a chosen brain (rule, claude, gemini, gemma, local) that picks
+"""The trading bot's brain and loop. Each bot has a chosen brain (rule, claude:<model>, gemini:<model>, gemma:<model>) that picks
 buy/sell/hold from the price history; if an AI brain is unavailable or answers badly, the built-in rule decides instead.
 The vault (not this file) enforces the real limits; clamping here just avoids silly requests.
 """
@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from parable import vault
 from parable.config import get_settings
+from parable.minds import claude_usable, note_claude_error
 from parable.models import BotRules, TradeDecision
 
 log = logging.getLogger("parable.bot")
@@ -141,16 +142,20 @@ def extract_json(text: str) -> dict:
     return found
 
 
-def claude_decide(state: dict) -> TradeDecision:
-    """Ask Claude. Thinking is on by default for Haiku 5.5, which rules out FORCING a tool, so we
+def claude_decide(state: dict, model: str | None = None) -> TradeDecision:
+    """Ask Claude. Thinking is on by default for the 5.5 models, which rules out FORCING a tool, so we
     offer the tool (auto) and ask for it in the prompt; low effort keeps it fast and cheap."""
     settings = get_settings()
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key, timeout=LLM_TIMEOUT_S)
-    reply = client.messages.create(
-        model=settings.bot_model, max_tokens=2000, tools=[DECISION_TOOL], tool_choice={"type": "auto"},
-        output_config={"effort": "low"},
-        messages=[{"role": "user", "content": build_prompt(state)}],
-    )
+    try:
+        reply = client.messages.create(
+            model=model or settings.bot_model, max_tokens=2000, tools=[DECISION_TOOL], tool_choice={"type": "auto"},
+            output_config={"effort": "low"},
+            messages=[{"role": "user", "content": build_prompt(state)}],
+        )
+    except Exception as err:
+        note_claude_error(err)
+        raise
     block = next(b for b in reply.content if b.type == "tool_use")  # no tool call -> error -> rule
     return to_decision(block.input)
 
@@ -176,12 +181,10 @@ def build_brains() -> dict[str, dict]:
     """The brains a bot can choose, built from settings: how each decides, and whether it is set up.
     Every Gemini / Gemma model in the .env lists is its own brain, so their results can be compared."""
     s = get_settings()
-    brains = {
-        "rule": {"decide": rule_decide, "ready": True},
-        "claude": {"decide": claude_decide, "ready": bool(s.anthropic_api_key and s.bot_model)},
-        "local": {"decide": lambda st: openai_style_decide(st, s.local_llm_base_url, "", s.local_llm_model),
-                  "ready": bool(s.local_llm_base_url and s.local_llm_model)},
-    }
+    brains = {"rule": {"decide": rule_decide, "ready": True}}
+    for model in [m.strip() for m in s.claude_models.split(",") if m.strip()]:
+        brains[f"claude:{model}"] = {"decide": lambda st, model=model: claude_decide(st, model),
+                                     "ready": bool(s.anthropic_api_key) and claude_usable()}
     for family, models in (("gemini", s.gemini_models), ("gemma", s.gemma_models)):
         for model in [m.strip() for m in models.split(",") if m.strip()]:
             brains[f"{family}:{model}"] = {

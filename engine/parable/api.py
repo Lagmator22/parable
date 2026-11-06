@@ -6,6 +6,7 @@ The "cheat" routes try things a dishonest creator would try; the vault must bloc
 import logging
 import os
 import secrets
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -16,13 +17,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from parable import world_pass
+from parable.swarm_api import router as swarm_router
 from parable.arena import MarketArena
 from parable.bot_runner import PRESETS, available_brains, code_fingerprint
 from parable.config import get_settings
 from parable.erc8004 import build_erc8004_feed
 from parable.launcher import (ApprovalDenied, ApprovalPending, Launcher, LaunchError, LaunchFailed, real_backends,
                               to_bytes32)
-from parable.manager import SwarmManager
 from parable.models import BotRules
 
 STATIC = Path(__file__).parent / "static"
@@ -30,7 +31,6 @@ FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "dist"  # the new 
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
 log = logging.getLogger("parable.api")
 _launcher: Launcher | None = None
-_manager: SwarmManager | None = None
 _arena = MarketArena()
 
 
@@ -53,16 +53,8 @@ def get_launcher() -> Launcher:
 
 def set_launcher(launcher: Launcher | None) -> None:
     """Tests use this to plug in a launcher built from fakes."""
-    global _launcher, _manager
+    global _launcher
     _launcher = launcher
-    _manager = None
-
-
-def get_manager() -> SwarmManager:
-    global _manager
-    if _manager is None:
-        _manager = SwarmManager(get_launcher())
-    return _manager
 
 
 def tx_url(tx: str | None) -> str | None:
@@ -72,11 +64,17 @@ def tx_url(tx: str | None) -> str | None:
 @asynccontextmanager
 async def lifespan(_app):
     get_launcher().start_poller()  # copies deaths from the vault into the graveyard
+    from parable.minds import probe_claude
+    from parable.swarm_api import get_recorder
+
+    get_recorder().start()  # live graph samples
+    threading.Thread(target=probe_claude, daemon=True).start()  # learn whether Claude has credit
     yield
 
 
 app = FastAPI(title="Parable", lifespan=lifespan)
 app.include_router(world_pass.router)
+app.include_router(swarm_router)
 
 
 @app.exception_handler(Exception)
@@ -285,21 +283,6 @@ def cheat_second_identity():
                    bot_address=bot, creator_id=old.creator_id, creator_wallet=other_wallet,
                    badge_node=to_bytes32("cheat"), expires_at=old.born_at + 86400, start_cash_usd=1_000_000,
                    max_trade_usd=1_000_000, max_loss_bps=1000, strategy_id=to_bytes32("cheat"))
-
-
-class ManagerRequest(BaseModel):
-    bots: int = 3
-    minutes: int = 15
-
-
-@app.get("/api/manager")
-def manager_status():
-    return get_manager().status()
-
-
-@app.post("/api/manager/start")
-def manager_start(req: ManagerRequest = ManagerRequest()):
-    return get_manager().start(count=req.bots, minutes=req.minutes, spawn_offline=offline())
 
 
 @app.get("/api/erc8004")
