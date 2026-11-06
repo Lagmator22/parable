@@ -10,6 +10,27 @@ Research assets: `DOMAIN_TRENDS.md` (4,297 past winners by domain), `WINNING_PAT
 differently), `winners.txt` (every winner's write-up), `prev_winners/` (cloned winning repos + ANALYSIS.md),
 `SPONSOR_TECH_CHECK.md` (doc-verified API facts: Uniswap testnets OK, Definitive mainnet-only, 0G verified mode).
 
+## 0. PARABLE PROJECT RULES (read first, they override anything below)
+
+**What we're building:** see `FINAL_PLAN.md`. **Module signatures:** `INTERFACES.md`. **Simple diagrams:** `ARCHITECTURE.md`.
+Partners: **ENS + Arkiv + World**. Build order: **CORE first** (FINAL_PLAN section 4), then phases, then stretch.
+
+**Code must be readable by a newcomer** (the owner is new to web3 and must explain every line to judges):
+- Small files, short functions (aim for ≤ 40 lines each), plain names (`register_bot`, not `rb`). No clever one-liners, metaprogramming or deep class hierarchies.
+- Every file starts with a 2–4 line comment: what this file does, in plain English.
+- Comment the *why* in plain words wherever web3 or finance logic happens (e.g. "price has 8 decimals, USD has 6, so we divide by 100").
+- Write the least code that works. No unused abstractions, no speculative features, no copy-paste walls. If a module passes ~300 lines, split it or simplify it.
+- Prefer one obvious way: Python (FastAPI + Pydantic + web3.py) everywhere except the contract (Solidity) and tiny frontend JS.
+
+**Docs to keep updated after every phase:**
+- `ARCHITECTURE.md`: **only flowcharts and diagrams, in very simple language** (no jargon without a one-line explanation). Update it whenever a flow changes.
+- `AGENTS.md` (this file): update section 0's "Iteration log" below after every phase: what works now, what changed, what's next.
+- `AI_USAGE.md`: one row per meaningful AI-generated chunk.
+
+**Iteration log**
+- 2026-11-06 12:00: Plan locked (FINAL_PLAN.md). Skeleton + interfaces committed.
+- 2026-11-06 12:30: Phase 1 started: 4 builders working in parallel on vault contract, Arkiv store, ENSv2 badge, World Agent Pass.
+
 ## 1. Mission
 
 - **Project name: Parable.** Use this name in the repo, README, submission and demo.
