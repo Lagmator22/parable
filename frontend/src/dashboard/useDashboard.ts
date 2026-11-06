@@ -28,7 +28,7 @@ export function useDashboard() {
           setCreator(a.value.default_creator);
         }
       } else setError(a.reason instanceof Error ? a.reason.message : 'Cannot reach the engine.');
-      if (b.status === 'fulfilled') setBrains(b.value);
+      if (b.status === 'fulfilled') setBrains(b.value.filter(brain => !brain.brain.startsWith('claude:')));
     });
   }, []);
 

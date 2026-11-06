@@ -13,14 +13,20 @@ test('loads the public creator in a fresh browser and keeps a saved creator', as
   const calls: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     calls.push(url);
-    const body = url === '/api/info' ? { default_creator: '0xpublic' } : url === '/api/manager' ? { enabled: true, mind: 'rule', bots: [], decisions: [] } : [];
+    const body = url === '/api/info' ? { default_creator: '0xpublic' } : url === '/api/brains' ? [
+      { brain: 'rule', available: true }, { brain: 'claude:claude-haiku-5-5', available: true },
+    ] : [];
     return { ok: true, json: async () => body };
   }));
-  function Probe() { const dashboard = useDashboard(); return <span>{dashboard.creator}</span>; }
+  function Probe() {
+    const dashboard = useDashboard();
+    return <span data-brains={dashboard.brains.map(brain => brain.brain).join(',')}>{dashboard.creator}</span>;
+  }
   const host = document.createElement('div'); document.body.append(host);
   const root = createRoot(host);
   await act(async () => { root.render(<Probe />); });
   expect(host.textContent).toBe('0xpublic');
+  expect(host.querySelector('[data-brains]')?.getAttribute('data-brains')).toBe('rule');
   expect(storage.get('parable.creator')).toBe('0xpublic');
   // Running bots and graves are public: the page asks for everyone's, not one creator's.
   expect(calls).toContain('/api/bots?status=alive');

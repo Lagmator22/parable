@@ -35,7 +35,7 @@ export function Swarm({ brains, swarm, onUpdate, onBorn, demoAllowed }: Props) {
   useEffect(() => () => { alive.current = false; }, []);
   useEffect(() => {  // defaults: the strongest available mind; two fast AI workers plus the plain rule to compare against
     const ok = ready.map(b => b.brain);
-    if (!mind) setMind(['claude:claude-opus-5-5', 'claude:claude-sonnet-5-5', 'gemini:gemini-3.5-flash-lite', ...ok.filter(b => b !== 'rule')].find(b => ok.includes(b)) || '');
+    if (!mind) setMind(['gemini:gemini-3.5-flash-lite', ...ok.filter(b => b !== 'rule')].find(b => ok.includes(b)) || '');
     if (!Object.keys(team).length && ok.includes('gemini:gemini-3.5-flash-lite')) setTeam({ 'gemini:gemini-3.5-flash-lite': 2, ...(ok.includes('rule') ? { rule: 1 } : {}) });
   }, [brains]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {  // this browser started the swarm, so it may stop its workers too
