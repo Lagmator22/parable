@@ -1,12 +1,14 @@
-export type Info = { offline: boolean; explorer: string; vault_address: string; ens_parent: string; arkiv_writer: string; arkiv_explorer: string; ens_app: string; strategies: string[] };
+export type Info = { offline: boolean; explorer: string; vault_address: string; ens_parent: string; arkiv_writer: string; arkiv_explorer: string; ens_app: string; strategies: string[]; default_creator: string; eth_price_usd: number | null };
 export type Brain = { brain: string; available: boolean };
 export type Rules = { strategy: string; brain: string; start_cash_usd: number; max_trade_usd: number; max_loss_bps: number; lease_seconds: number };
-export type Bot = { bot_id: number; bot_address: string; creator_id: string; ens_name: string; strategy: string; status: string; born_at: number; born_tx: string; rules: Rules; equity_usd: number | null; pnl_bps: number | null; tx_url: string | null };
+export type Bot = { bot_id: number; bot_address: string; creator_id: string; ens_name: string; strategy: string; status: string; born_at: number; born_tx: string; rules: Rules; code_hash: string; equity_usd: number | null; pnl_bps: number | null; tx_url: string | null };
 export type Event = { bot_id: number; kind: string; at: number; tx_hash: string | null; data: Record<string, unknown> };
-export type Grave = { bot_id: number; cause: string; final_equity_usd: number; start_cash_usd: number; pnl_bps: number; lifetime_s: number; tx_hash: string; ens_name: string; brain: string; tx_url: string | null };
+export type Grave = { bot_id: number; cause: string; final_equity_usd: number; start_cash_usd: number; pnl_bps: number; lifetime_s: number; tx_hash: string; ens_name: string; brain: string; code_hash?: string; tx_url: string | null };
 export type Report = { subject: string; launched: number; alive: number; dead: number; profitable: number; worst_pnl_bps: number; avg_pnl_bps: number; vault_count_matches: boolean };
 export type BrainReport = Brain & Omit<Report, 'subject' | 'vault_count_matches'>;
 export type Attack = { attack: string; blocked: boolean; reason: string };
+export type ManagerDecision = { at: number; action: 'launch' | 'keep' | 'flag' | 'kill'; bot_id: number | null; reason: string };
+export type Manager = { enabled: boolean; mind: string; bots: number[]; decisions: ManagerDecision[] };
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
@@ -22,10 +24,10 @@ export function post<T>(url: string, body?: unknown, headers?: Record<string, st
 }
 
 export function getCreator(): string {
-  try { return localStorage.getItem('creator') || ''; } catch { return ''; }
+  try { return localStorage.getItem('parable.creator') || localStorage.getItem('creator') || ''; } catch { return ''; }
 }
 export function saveCreator(value: string): void {
-  try { localStorage.setItem('creator', value); } catch { /* private browsing */ }
+  try { localStorage.setItem('parable.creator', value); localStorage.setItem('creator', value); } catch { /* private browsing */ }
 }
 export function getOwner(id: number): string {
   try { return JSON.parse(localStorage.getItem('owners') || '{}')[String(id)] || ''; } catch { return ''; }

@@ -72,10 +72,13 @@ class SwarmManager:
         self.tracked_ids: list[int] = []
 
     def _record(self, action: str, bot_id: int, reason: str) -> None:
+        self.decisions = [d for d in self.decisions if not (d.bot_id == bot_id and d.action == action)]
         self.decisions.insert(0, Decision(at=int(time.time()), action=action, bot_id=bot_id, reason=reason))
         del self.decisions[30:]  # keep the 30 most recent decisions
 
     def status(self) -> dict:
+        if not self.decisions and not self.tracked_ids:
+            self.audit("rule")
         bots = sorted({*self.tracked_ids, *self.launcher.live.keys()})
         return {
             "enabled": True,
