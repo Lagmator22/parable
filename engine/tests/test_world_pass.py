@@ -59,6 +59,7 @@ def _id_token(nonce, **over):
 
 
 def _start_real(client, ref="p1"):
+    wp.register_pending(ref)
     r = client.get("/world/start", params={"purpose": "launch_bot", "ref": ref})
     assert r.status_code == 302
     q = parse_qs(urlparse(r.headers["location"]).query)
@@ -185,6 +186,7 @@ def test_alg_none_rejected(client, monkeypatch):
 # ---- mock flow
 
 def _mock_state(client, ref="m1"):
+    wp.register_pending(ref)
     r = client.get("/world/start", params={"purpose": "launch_bot", "ref": ref})
     assert r.status_code == 200 and "MOCK" in r.text
     return re.search(r"name=state value='([^']+)'", r.text).group(1)
@@ -233,4 +235,10 @@ def test_retry_after_denial_can_approve_but_approval_is_final(client, monkeypatc
 
 def test_unconfigured_real_mode_fails_closed(client, monkeypatch):
     monkeypatch.delenv("WORLD_CLIENT_SECRET")
+    wp.register_pending("p1")
     assert client.get("/world/start", params={"purpose": "launch_bot", "ref": "p1"}).status_code == 503
+
+
+def test_unknown_launch_id_is_rejected(client):
+    """World approval only works for launch ids that Parable's server created (no hijacking)."""
+    assert client.get("/world/start", params={"purpose": "launch_bot", "ref": "never-created"}).status_code == 404

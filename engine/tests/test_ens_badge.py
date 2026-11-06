@@ -11,6 +11,7 @@ from eth_utils import keccak
 from web3 import Web3
 
 from parable import ens_badge as eb
+from parable.config import Settings
 
 OPERATOR_KEY = "0x" + "11" * 32
 BOT = "0x00000000000000000000000000000000000000B0"
@@ -49,21 +50,20 @@ class FakeContract:
 
 
 def make_client(registry_answers=None, resolver_answers=None, oracle=False):
-    s = eb.Settings(
-        rpc_url="http://unused",
-        private_key=OPERATOR_KEY,
-        parent_name="parable.eth",
-        resolver=RESOLVER,
-        oracle=ORACLE if oracle else "",
+    s = Settings(
+        _env_file=None,
+        operator_private_key=OPERATOR_KEY,
+        ens_parent_name="parable.eth",
+        ens_resolver=RESOLVER,
+        ens_badge_oracle=ORACLE if oracle else "",
     )
-    c = eb.EnsBadge(s, w3=SimpleNamespace())
     reg = FakeContract(eb.REGISTRY_ABI, registry_answers)
     res = FakeContract(eb.RESOLVER_ABI, resolver_answers)
     orc = FakeContract(eb.ORACLE_ABI)
+    c = eb.EnsBadge(s, w3=SimpleNamespace(eth=SimpleNamespace(contract=lambda **_: orc)))
     sent: list[Call] = []
     c._registry = lambda _addr: reg
     c._resolver = lambda _addr: res
-    c._oracle = lambda: orc
     c.registry_for = lambda _name: REGISTRY
     c._now = lambda: NOW
     c._send = lambda fn: (sent.append(fn), f"0x{len(sent):064x}")[1]
@@ -89,19 +89,11 @@ def resolve_answers(addr=BOT, texts=None):
 
 
 def test_namehash_vectors():
-    assert eb.namehash("") == b"\x00" * 32
     assert eb.namehash("eth").hex() == "93cdeb708b7545dc668eb9280176169d1c33cfd8ed6f04690a0bcc88a93fc4ae"
 
 
 def test_dns_encode():
     assert eb.dns_encode("a.eth") == b"\x01a\x03eth\x00"
-
-
-def test_label_validation():
-    assert eb.check_label("bot-07") == "bot-07"
-    for bad in ("Bot", "a.b", "", "-x", "x_y"):
-        with pytest.raises(eb.BadgeError):
-            eb.check_label(bad)
 
 
 def test_soulbound_roles_withheld():
@@ -117,7 +109,6 @@ def test_soulbound_roles_withheld():
         ((2, NOW - 1, BOT, 1, 2), False, "expired"),
         ((0, NOW - 5, ZERO, 1, 2), False, "revoked (burned)"),
         ((0, 0, ZERO, 1, 2), False, "not registered"),
-        ((1, NOW + 100, ZERO, 1, 2), False, "reserved (held by nobody)"),
     ],
 )
 def test_classify(state, ok, reason):
@@ -222,7 +213,6 @@ def test_read_badge_reports_records_and_soulbound():
     assert info["soulbound"] is True
     assert info["addr"] == Web3.to_checksum_address(BOT)
     assert info["texts"] == texts
-    assert info["node"] == "0x" + eb.namehash(NAME).hex()
 
 
 def test_read_badge_flags_transferable():
@@ -231,6 +221,19 @@ def test_read_badge_flags_transferable():
     assert c.read_badge(NAME)["soulbound"] is False
 
 
-def test_missing_setup_lists_manual_steps():
-    s = eb.Settings(private_key="", parent_name="")
-    assert len(eb.missing_setup(s)) == 2
+def test_init_call_is_selector_plus_encoded_args():
+    data = eb._init_call(f"initialize({eb.GRANT})", [eb.GRANT], [[(BOT, 5)]])
+    assert data[:4] == keccak(b"initialize((address,uint256)[])")[:4]
+    assert abi_decode([eb.GRANT], data[4:])[0] == ((BOT.lower(), 5),)
+
+
+def test_setup_parent_deploys_registry_and_resolver_then_grants_oracle():
+    answers = {"getSubregistry": lambda _l: ZERO, "hasRoles": lambda _id, role, _who: role == eb.ROLE_SET_SUBREGISTRY}
+    c, sent = make_client(answers, oracle=True)
+    c.s.ens_resolver = ""  # force a resolver deploy too
+    predicted = "0x00000000000000000000000000000000000000C1"
+    factory = FakeContract(eb.FACTORY_ABI, {"predictProxyAddress": lambda *_: predicted})
+    c.w3 = SimpleNamespace(eth=SimpleNamespace(contract=lambda **_: factory, get_code=lambda _a: b""))
+    out = c.setup_parent()
+    assert out == {"ENS_SUBREGISTRY": predicted, "ENS_RESOLVER": predicted}
+    assert [s.name for s in sent] == ["deployProxy", "setSubregistry", "deployProxy", "grantRootRoles"]

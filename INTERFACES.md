@@ -62,3 +62,13 @@ class ReportCard(BaseModel): subject: str; launched: int; alive: int; dead: int;
 
 ## Env (.env, never committed; see .env.example)
 `SEPOLIA_RPC_URL, OPERATOR_PRIVATE_KEY, VAULT_ADDRESS, CHAINLINK_ETH_USD=0x694AA1769357215DE4FAC081bf1f309aDC325306, ENS_PARENT_NAME, ARKIV_RPC_URL=https://rpc.rabdi.db-chain.testnet.arkiv.network, ARKIV_PRIVATE_KEY, WORLD_CLIENT_ID, WORLD_CLIENT_SECRET, WORLD_MOCK, ANTHROPIC_API_KEY, BOT_MODEL=claude-haiku-5-5`
+
+## Launcher & API (engine/parable/launcher.py, api.py, fake_chain.py, static/)
+`Launcher(backends)` takes any object with `.vault .ens .arkiv .runner .world` (real modules via `real_backends()`, fakes via `fake_chain.fake_backends(world)`). `PARABLE_OFFLINE=1` makes `api.py` use the fakes (dashboard shows an OFFLINE SIMULATION banner).
+What the launcher assumes from other modules (keep in sync if they differ):
+- `creator_id` everywhere is a 0x bytes32 hex string = sha256 of the World approval subject. Same for `strategy_id`.
+- `vault.fund_gas(address) -> tx`; `vault.register_bot(bot_address=, creator_id=, creator_wallet=, badge_node=, expires_at=, start_cash_usd=, max_trade_usd=, max_loss_bps=, strategy_id=) -> (bot_id, tx)` (keyword args).
+- `vault.get_bot(id)` returns a dict with `status` ("alive"/"dead" or 1/2), `cause` (1 expired, 2 killed, 3 loss_limit, or the name), `final_equity_usd`, optional `died_at`. Vault calls raise on revert; `vault.decode_revert(err) -> str`.
+- `bot_runner.run_bot(bot_id, bot_key, rules, stop_event, on_event=None)`; `on_event(kind: "trade"|"rejected", tx_hash|None, data: dict)` is called per event.
+- `arkiv.put_death(d, creator_id=, strategy=)` (extra kwargs are the real store's optional filters); `arkiv.report_card(creator_id, strategy)`; the launcher overrides `vault_count_matches` itself using `vault.counts(creator_id)`.
+Routes: `POST /api/launch`, `POST /api/launch/{id}/confirm`, `GET /api/bots`, `GET /api/graveyard/{creator_id}`, `GET /api/report`, `POST /api/bots/{id}/{kill|check|expire}`, `POST /api/cheat/{unregistered-trade|over-limit/{id}|second-identity}`, `GET /api/info`.

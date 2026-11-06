@@ -72,6 +72,15 @@ class ApprovalStore:
         self._lock = threading.Lock()
         self._attempts: dict[str, _Attempt] = {}
         self._approvals: dict[str, Approval] = {}
+        self._pending: set[str] = set()  # launch ids created by Parable's own server
+
+    def register_pending(self, pending_id: str) -> None:
+        with self._lock:
+            self._pending.add(pending_id)
+
+    def is_pending(self, pending_id: str) -> bool:
+        with self._lock:
+            return pending_id in self._pending
 
     def new_attempt(self, pending_id: str) -> _Attempt:
         a = _Attempt(
@@ -114,6 +123,7 @@ class ApprovalStore:
         with self._lock:
             self._attempts.clear()
             self._approvals.clear()
+            self._pending.clear()
 
 
 store = ApprovalStore()
@@ -121,6 +131,11 @@ store = ApprovalStore()
 
 def get_approval(pending_id: str) -> Approval | None:
     return store.get(pending_id)
+
+
+def register_pending(pending_id: str) -> None:
+    """The launcher calls this, so /world/start only works for launches our server created."""
+    store.register_pending(pending_id)
 
 
 # ---------------------------------------------------------------- config
@@ -275,6 +290,8 @@ def start(purpose: str = Query(...), ref: str = Query(...)):
         raise HTTPException(400, f"unsupported purpose; expected {PURPOSE}")
     if not _REF_RE.match(ref):
         raise HTTPException(400, "invalid ref")
+    if not store.is_pending(ref):
+        raise HTTPException(404, "unknown launch id: start the launch from Parable first")
     if _mock():
         attempt = store.new_attempt(ref)
         form = lambda decision, label: (  # noqa: E731

@@ -17,7 +17,7 @@ Source: https://docs.ens.domains/learn/deployments (ENSv2 Sepolia section, ABIs 
 | UniversalResolverV2 | `0x24e1d8e068620b647ca097f961a61055f4f42d72` |
 | ENS app | https://sepolia.app.ens.domains |
 
-Prior-art addresses are **stale**: ENSign (`0xDEDB9291...`, deployment `sepolia-official-v1-20260525-r2`) and Batas (`UserRegistry` impl `0x624a25D6...`, factory `0x10Dc6333...`, resolver `0x9EAE5c27...`) used earlier staging deployments. Do not use them. Every address is overridable by env (`ENS_ROOT_REGISTRY`, `ENS_FACTORY`, `ENS_USER_REGISTRY_IMPL`, `ENS_RESOLVER_IMPL`) because Sepolia ENSv2 has been reset before.
+Prior-art addresses are **stale**: ENSign (`0xDEDB9291...`, deployment `sepolia-official-v1-20260525-r2`) and Batas (`UserRegistry` impl `0x624a25D6...`, factory `0x10Dc6333...`, resolver `0x9EAE5c27...`) used earlier staging deployments. Do not use them. Every address is a setting in `engine/parable/config.py`, overridable in `.env` (`ENS_ROOT_REGISTRY`, `ENS_FACTORY`, `ENS_USER_REGISTRY_IMPL`, `ENS_RESOLVER_IMPL`) because Sepolia ENSv2 has been reset before. The other ENS settings are `ENS_PARENT_NAME`, `ENS_RESOLVER` and `ENS_BADGE_ORACLE`.
 
 Interface drift that mattered (the prior art is written against the older contracts):
 - `UserRegistry.initialize(Grant[] grants)` and `PermissionedResolver.initialize(Grant[] grants, bytes[] calls)`, where `Grant = (address account, uint256 roleBitmap)`. Older code used `initialize(address, uint256)`.
@@ -32,7 +32,7 @@ Registry roles (`RegistryRolesLib`, a role's admin is the role `<< 128`):
 |---|---|---|
 | Operator | subname registry **root** (set in `initialize`) | `REGISTRAR`, `UNREGISTER`, `RENEW`, `SET_RESOLVER` plus their admins |
 | Operator | parent name token (given by registering it) | `SET_SUBREGISTRY` (used once, to attach our registry) |
-| `EnsV2BadgeOracle` | subname registry root (granted by operator, `grant_oracle_unregister`) | `UNREGISTER` only |
+| `EnsV2BadgeOracle` | subname registry root (granted by operator inside `setup_parent()`) | `UNREGISTER` only |
 | Badge token owner (= operator) | the badge token | **no roles at all** (`roleBitmap = 0`) |
 
 Resolver roles (`PermissionedResolverLib`): operator holds `SET_ADDRESS` and `SET_TEXT` plus admins, at the resolver root.
@@ -46,18 +46,29 @@ Resolver roles (`PermissionedResolverLib`): operator holds `SET_ADDRESS` and `SE
 
 Distinguishing revoked from lapsed (Batas lesson): `unregister` clears `latestOwner` and sets expiry to the revoke moment, while a plain lapse keeps the owner. `classify()` uses the owner field for that. Token ids carry a version in the low 32 bits; the registry accepts the plain labelhash as an id and strips it itself, so we never derive token ids by hand.
 
-## Deploy order (for the lead)
+## Deploy order
+Contracts: `cd contracts && forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --private-key $OPERATOR_PRIVATE_KEY --broadcast` with env `PRICE_FEED` (Chainlink ETH/USD), `OPERATOR` (the address of that key), `MAX_PRICE_AGE`. The script does, in this order:
 1. Deploy `EnsV2BadgeOracle(operator)`.
 2. Deploy `ParableVault(priceFeed, oracle, operator, maxPriceAge)`.
-3. `oracle.setVault(vault)` as operator (one-shot).
-4. Set `ENS_BADGE_ORACLE=<oracle>` and run `EnsBadge().setup_parent()` (or the spike): it attaches the subregistry, deploys the resolver, and grants the oracle `ROLE_UNREGISTER`.
+3. `oracle.setVault(vault)` (operator only, one-shot, so the broadcaster must be the operator).
+It prints both addresses. Put them in `.env` as `ENS_BADGE_ORACLE` and `VAULT_ADDRESS`.
+
+**Extra step after deploy (not done by the script):** the oracle must be allowed to burn badges when the vault kills a bot. With `ENS_BADGE_ORACLE` set in `.env`, run `EnsBadge().setup_parent()` (or `uv run python ../spikes/ens_spike.py`): it attaches the subregistry, deploys the resolver, and grants the oracle `ROLE_UNREGISTER` on the subregistry root. Re-running is safe. Without this grant `revoke` still marks the badge dead locally, it just cannot burn the ENS name.
+
+**Fallback if ENS is blocked:** `USE_DEV_ORACLE=1` deploys `AlwaysValidBadgeOracle` instead (every badge counts as valid, no `setVault`). Dev only, and say so in the demo.
 
 ## Status text record: "bot may edit only its own `status`"
 Not done, deliberately. In the current `PermissionedResolver` a setter role is scoped by record **key**, not by name: granting a bot `SET_TEXT` on `status` would let it write `status` for every name on that resolver (the name is just a function argument). Per-name scoping needs one resolver per bot. That is feasible (deploy a proxy through the VerifiableFactory, pre-set records with the `calls` argument of `initialize`, then `grantSetterRoles(setText(name,"status",""), bot)` so only that key is writable), but it costs two more transactions per bot, so the shared resolver with operator-only writes is the default. `issue_badge` writes `status=alive`; the engine can update it via the operator.
 
 ## Verified vs not
-Verified: the oracle against mock registry/resolver contracts compiled with solc 0.8.24 (valid, wrong bot, expired, addr mismatch, vault-only revoke burns, revoke survives a failing registry, bind guards, one-shot `setVault`); the Python module against mocks (`engine/tests/test_ens_badge.py`); live read-only calls against the real Sepolia ENSv2 registries; `eth_call` simulation of `VerifiableFactory.deployProxy` for both the UserRegistry and PermissionedResolver initialisers against the live implementations.
-Not verified (needs a funded operator and a registered parent name): a real `register` with an empty role bitmap, `setSubregistry` on a real parent, the resolver `multicall` of setters, `unregister` by the oracle, and the end-to-end `ens_spike.py` flow. `parable.eth` was unregistered on Sepolia when checked, so a name must be registered first.
+Verified:
+- Python module against mocks (`engine/tests/test_ens_badge.py`, includes `setup_parent`); `uv run pytest` is green.
+- Live read-only on Sepolia (2026-11-06): the four ENSv2 addresses have code, and `registry_for`, `getState`, `is_valid` decode correctly against the real `.eth` registry.
+- Oracle and vault tests compile with solc 0.8.24 (`EnsV2BadgeOracle.t.sol` uses fake registry and resolver; `Deploy.s.sol` compiles). Earlier phase: oracle checked against mock contracts and `eth_call` simulation of `VerifiableFactory.deployProxy`.
+
+Not verified:
+- The Foundry tests have not been RUN: Foundry (`forge`) is not installed on this machine. Install with `foundryup`, then `cd contracts && forge install foundry-rs/forge-std --no-git && forge test -vv`.
+- Anything needing a funded operator and a registered parent name: a real `register` with an empty role bitmap, `setSubregistry` on a real parent, the resolver `multicall`, `unregister` by the oracle, `ens_spike.py` end to end, and `Deploy.s.sol` on Sepolia. No `.env` exists yet, and `parable.eth` was unregistered on Sepolia when checked.
 
 ## Fallback if ENSv2 Sepolia subnames prove impossible today
 1. Same Python/Solidity interface, but **skip the registry**: keep the badge record inside the oracle (`bind` stores expiry and bot, `revoke` sets a flag). Then ENS is only a text-record decoration on the parent name, as in FINAL_PLAN's fallback. `isValid` would check the stored expiry instead of `getState`.

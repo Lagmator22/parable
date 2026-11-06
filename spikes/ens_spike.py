@@ -18,6 +18,7 @@ from eth_account import Account  # noqa: E402
 from web3 import Web3  # noqa: E402
 
 from parable import ens_badge as eb  # noqa: E402
+from parable.config import get_settings  # noqa: E402
 
 TX = "https://sepolia.etherscan.io/tx/"
 
@@ -44,19 +45,23 @@ def link(h: str) -> str:
 
 
 def main() -> int:
-    s = eb.Settings()
-    w3 = Web3(Web3.HTTPProvider(s.rpc_url, request_kwargs={"timeout": 30}))
-    print(f"rpc {s.rpc_url} chain_id={w3.eth.chain_id} block={w3.eth.block_number}")
+    s = get_settings()
+    w3 = Web3(Web3.HTTPProvider(s.sepolia_rpc_url, request_kwargs={"timeout": 30}))
+    print(f"rpc {s.sepolia_rpc_url} chain_id={w3.eth.chain_id} block={w3.eth.block_number}")
     for name, addr in [
-        ("RootRegistry", s.root_registry),
-        ("VerifiableFactory", s.factory),
-        ("UserRegistryImpl", s.registry_impl),
-        ("PermissionedResolverImpl", s.resolver_impl),
+        ("RootRegistry", s.ens_root_registry),
+        ("VerifiableFactory", s.ens_factory),
+        ("UserRegistryImpl", s.ens_user_registry_impl),
+        ("PermissionedResolverImpl", s.ens_resolver_impl),
     ]:
         has_code = len(w3.eth.get_code(Web3.to_checksum_address(addr))) > 0
         print(f"  {name:26} {addr} code={'yes' if has_code else 'NO (ENSv2 Sepolia may have been reset)'}")
 
-    missing = eb.missing_setup(s)
+    missing = [
+        name
+        for name, value in [("OPERATOR_PRIVATE_KEY", s.operator_private_key), ("ENS_PARENT_NAME", s.ens_parent_name)]
+        if not value
+    ]
     if missing:
         print("\nWrite flow skipped. Missing: " + "; ".join(missing))
         print(MANUAL_STEPS)
@@ -80,12 +85,12 @@ def main() -> int:
     client._send = logged_send  # type: ignore[method-assign]
 
     # Parent must be an ENSv2 name this operator owns.
-    label, _ = eb.split_name(s.parent_name)
-    parent_reg = client._registry(client.registry_for(s.parent_name))
+    label, _ = eb.split_name(s.ens_parent_name)
+    parent_reg = client._registry(client.registry_for(s.ens_parent_name))
     state = parent_reg.functions.getState(eb.label_id(label)).call()
     ok, reason = eb.classify(state, client._now())
     if not ok or state[2].lower() != op.lower():
-        print(f"\n{s.parent_name}: {reason}; owner={state[2]}. The operator must own it on ENSv2 Sepolia.")
+        print(f"\n{s.ens_parent_name}: {reason}; owner={state[2]}. The operator must own it on ENSv2 Sepolia.")
         print(MANUAL_STEPS)
         return 0
 
@@ -93,14 +98,14 @@ def main() -> int:
     addrs = client.setup_parent()
     for k, v in addrs.items():
         print(f"  {k}={v}")
-    if not s.resolver:
-        s.resolver = addrs["ENS_RESOLVER"]
+    if not s.ens_resolver:
+        s.ens_resolver = addrs["ENS_RESOLVER"]
         print("  (add ENS_RESOLVER to .env so later runs reuse it)")
 
     bot = Account.create().address
     label = f"spike-{int(time.time()) % 100000}"
     expires = client._now() + 3600
-    print(f"\n[1] issue_badge {label}.{s.parent_name} for bot {bot}, expires in 1h")
+    print(f"\n[1] issue_badge {label}.{s.ens_parent_name} for bot {bot}, expires in 1h")
     name, node = client.issue_badge(
         label, bot, expires, {"rules": "spike: hold only", "creator": "0xspike", "born": str(int(time.time()))}
     )

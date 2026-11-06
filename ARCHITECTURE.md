@@ -105,3 +105,75 @@
 ```
 
 *Diagrams are updated after every build phase.*
+
+---
+
+## 6. What is built so far (after Phase 2), and which file does what
+```
+                         YOUR BROWSER  (dashboard: engine/parable/static/)
+                         Launch · Live bots · 🪦 Graveyard · Report card · Try to cheat
+                                        │  (asks every 3 seconds)
+                                        ▼
+  ┌──────────────────────────────────────────────────────────────────────────────┐
+  │ api.py        the web server: receives button clicks, sends back results     │
+  │   │                                                                          │
+  │   ▼                                                                          │
+  │ launcher.py   the "manager": runs the launch steps in order, ends bots,      │
+  │               copies every death from the vault into the graveyard           │
+  │   │                                                                          │
+  │   ├─▶ world_pass.py  asks World ID "is this a real person, do you approve?"  │
+  │   ├─▶ ens_badge.py   makes / reads / removes the bot's name tag (ENS)        │
+  │   ├─▶ vault.py       talks to the vault contract on the practice blockchain  │
+  │   ├─▶ arkiv_store.py writes / reads the public notebook (Arkiv)              │
+  │   │        │                                                                 │
+  │   │        ▼                                                                 │
+  │   │   arkiv-bridge/  tiny helper program using Arkiv's official tool (JS SDK)│
+  │   │                                                                          │
+  │   └─▶ bot_runner.py  the bot's brain loop: price → AI decides → ask to trade │
+  │                       (AI down or confused? → simple backup rule)            │
+  │                                                                              │
+  │ fake_chain.py  a pretend vault/ENS/Arkiv for practice when the internet or   │
+  │                keys are missing. The page then shows "OFFLINE SIMULATION".   │
+  └──────────────────────────────────────────────────────────────────────────────┘
+                                        │
+                                        ▼
+               contracts/src/ParableVault.sol   (the vault: holds money, keeps score)
+               contracts/src/adapters/EnsV2BadgeOracle.sol (lets the vault check name tags)
+```
+
+## 7. Launching a bot, with the safety locks
+```
+  You click "Launch"
+        │
+        ▼
+  Server makes a launch ticket:  launch id + secret claim code (only YOUR browser gets the code)
+        │
+        ▼
+  World ID page opens ──▶ accepts ONLY launch ids the server made (fake ids → refused)
+        │  you approve
+        ▼
+  Your browser says "confirm" + claim code ──▶ wrong code → refused (nobody can steal your approval)
+        │
+        ▼
+  New bot wallet → a little test ETH for fees → ENS name tag → vault registers it → notebook "born"
+        │
+        ▼
+  Bot loop starts
+```
+
+## 8. Holes we know about, and how we'll fix them (improvement pipeline)
+| # | Hole (plain words) | How bad | Fix / plan |
+|---|---|---|---|
+| 1 | **Nothing has run on a real blockchain yet.** All tests use pretend versions | 🔴 Big | Needs your keys + test money, then run the 3 spike scripts and deploy the vault |
+| 2 | Contract tests never actually ran (Foundry not installed) | 🔴 Big | Install Foundry, run `forge test` |
+| 3 | Writing to Arkiv and creating ENS names is untested for real | 🟠 Medium | Fund the Arkiv wallet + register an ENS name, run spikes |
+| 4 | Parable's server is trusted to say "this creator passed World ID" when it registers a bot | 🟡 Known limit | Say it honestly in README; stretch: check World proof on-chain |
+| 5 | The vault's "best score so far" only updates when the bot trades | 🟡 Small | Fine for demo; note in README |
+| 6 | If the server restarts, running bots lose their keys (kept in memory only, on purpose) and simply expire | 🟡 Small | Document; short leases for demo |
+| 7 | World approvals are kept in memory: a restart forgets pending launches | 🟡 Small | Fine for demo |
+| 8 | Each bot needs 0.003 test ETH for fees, so the operator wallet must hold enough | 🟡 Small | Keep ~0.1 Sepolia ETH in the operator wallet |
+| 9 | Sepolia's Chainlink price updates about once an hour | 🟡 Small | Set MAX_PRICE_AGE to 7200 seconds |
+| 10 | "Unregistered bot" demo shows `NotBot`; clearer to also show `NotRegistered` | 🟢 Polish | Add a second cheat button |
+| 11 | MCP (Claude Code / Codex access) and the Opus manager are not started | ⚪ Stretch | Phase 4, only after the core runs for real |
+
+*Phase 2 status: 69 automated tests pass; full flow works in offline simulation; real-chain run waits for keys.*
