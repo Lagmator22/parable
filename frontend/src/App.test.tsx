@@ -40,7 +40,7 @@ test('switches theme immediately without View Transitions', async () => {
   await act(async () => root.unmount());
 });
 
-test('renders demo-first section order, collapsed simulation arena, and filters compare brains to launched > 0', async () => {
+test('renders sections in demo order, plain words, no emoji, and only launched brains', async () => {
   vi.stubGlobal('localStorage', {
     getItem: (key: string) => (key === 'parable.creator' ? '0xcreator' : null),
     setItem: () => {},
@@ -66,14 +66,15 @@ test('renders demo-first section order, collapsed simulation arena, and filters 
   const root = createRoot(host);
   await act(async () => root.render(<App />));
 
-  const ids = Array.from(host.querySelectorAll('main > section, main > .proof-bar'))
-    .map(el => el.id || el.className);
-  expect(ids).toEqual(['proof-bar', 'hero', 'launch', 'live', 'graveyard', 'proof', 'extras', 'how']);
-  expect(host.textContent).toContain('SIMULATION, not the real vault');
-  expect(host.querySelector('.arena-body')).toBeNull();
-  expect(host.textContent).toContain('Hit loss limit');
-  expect(host.textContent).toContain('Simple rule (no AI)');
-  expect(host.textContent).not.toContain('claude');
-
+  const ids = Array.from(host.querySelectorAll('main > section')).map(el => el.id);
+  expect(ids).toEqual(['hero', 'launch', 'live', 'graveyard', 'cheat', 'more', 'how']);
+  const text = host.textContent || '';
+  expect(text).toContain('Practice arena');
+  expect(host.querySelector('.arena-pick')).toBeNull();  // the arena stays folded until opened
+  expect(text).toContain('Lost too much, the vault ended it');
+  expect(text).toContain('Simple rule (no AI)');
+  expect(text).not.toContain('claude');  // brains with no launches are hidden
+  expect(text).not.toMatch(/LIVE ·|SIMULATION|proof/i);  // no shouting tags
+  expect(text).not.toMatch(/\p{Extended_Pictographic}/u);  // our own icons, never emoji
   await act(async () => root.unmount());
 });

@@ -1,134 +1,110 @@
+// The whole page, top to bottom: headline, launch, live bots, graveyard, try to cheat, more, how it works.
+// Data comes from useDashboard (the engine's /api routes). Motion is in components/ui/motion.ts.
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Moon, Sun, X } from 'lucide-react';
-import { ScrambleButton, ScrambleLink } from './components/ui/ScrambleButton';
+import { Moon, Sun } from 'lucide-react';
+import { LinkButton } from './components/ui/Button';
+import { Ledger, Person, Tag, Tomb, Vault } from './components/ui/Glyphs';
+import { useCursorRing, useReveal } from './components/ui/motion';
+import { Section } from './components/ui/Section';
 import { Arena } from './dashboard/Arena';
+import { Cheat } from './dashboard/Cheat';
+import { Facts } from './dashboard/Facts';
 import { Launch } from './dashboard/Launch';
 import { Live } from './dashboard/Live';
-import { ProofBar } from './dashboard/ProofBar';
-import { CompareBrains, Record } from './dashboard/Record';
+import { CompareBrains, Graveyard } from './dashboard/Record';
 import { Swarm } from './dashboard/Swarm';
 import { useDashboard } from './dashboard/useDashboard';
 
 type Theme = 'dark' | 'light';
-const nav = [
-  { label: 'Home', href: '#top' },
-  { label: 'Launch', href: '#launch' },
-  { label: 'Live bots', href: '#live' },
-  { label: 'Graveyard', href: '#graveyard' },
-  { label: 'Try to cheat', href: '#proof' },
-  { label: 'Extras', href: '#extras' },
-  { label: 'How it works', href: '#how' },
-];
+const nav = [['Launch', '#launch'], ['Live', '#live'], ['Graveyard', '#graveyard'], ['Try to cheat', '#cheat'], ['More', '#more']];
+const steps = [
+  [Person, 'A person approves the bot', 'World ID makes sure one human is behind each creator.'],
+  [Tag, 'The bot gets a name', 'An ENS name like bot-7.parable.eth. It expires, can’t be sold, and can be taken away.'],
+  [Vault, 'The vault does the trading', 'The bot only asks. The vault checks the name and the limits, then trades at the Chainlink price.'],
+  [Ledger, 'Everything is written down', 'Births, trades, refusals and deaths go to Arkiv. Nobody can delete a dead bot.'],
+] as const;
 
 function savedTheme(): Theme {
   try { return localStorage.getItem('parable-theme') === 'light' ? 'light' : 'dark'; }
   catch { return 'dark'; }
 }
 
-function scrollToSection(event: React.MouseEvent<HTMLAnchorElement>, hash: string) {
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  const target = document.getElementById(hash.slice(1));
-  if (!target) return;
-  event.preventDefault();
-  if (window.location.hash !== hash) window.history.pushState(null, '', hash);
-  target.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-}
-
 export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const dashboard = useDashboard();
+  const [scrolled, setScrolled] = useState(false);
+  const d = useDashboard();
   const switching = useRef(false);
+  useReveal();
+  useCursorRing();
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem('parable-theme', theme); } catch { /* private browsing */ }
   }, [theme]);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // The new theme grows out of the button in a circle (View Transitions); older browsers just switch.
   function toggleTheme(event: React.MouseEvent<HTMLButtonElement>) {
     if (switching.current) return;
     const next = theme === 'dark' ? 'light' : 'dark';
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion || !document.startViewTransition) { setTheme(next); return; }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !document.startViewTransition) { setTheme(next); return; }
     switching.current = true;
     const root = document.documentElement;
-    const x = event.clientX;
-    const y = event.clientY;
-    root.style.setProperty('--ripple-x', `${x}px`);
-    root.style.setProperty('--ripple-y', `${y}px`);
-    const transition = document.startViewTransition(() => {
-      root.dataset.theme = next;
-      flushSync(() => setTheme(next));
-    });
-    transition.finished.finally(() => { switching.current = false; });
+    root.style.setProperty('--ripple-x', `${event.clientX}px`);
+    root.style.setProperty('--ripple-y', `${event.clientY}px`);
+    document.startViewTransition(() => { root.dataset.theme = next; flushSync(() => setTheme(next)); })
+      .finished.finally(() => { switching.current = false; });
   }
-  useEffect(() => {
-    if (!menuOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false); };
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
-  return <div className="site-shell" id="top">
-    <header className="site-header" inert={menuOpen}>
-      <a className="brand" href="#top">Parable<span>.</span></a>
-      <div className="header-actions">
-        <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? <Sun size={22}/> : <Moon size={22}/>}</button>
-        <ScrambleButton label="Menu" className="menu-trigger" onClick={() => setMenuOpen(true)} aria-expanded={menuOpen} aria-controls="page-menu" />
-      </div>
+
+  const refreshAll = () => { void d.refreshLive(); void d.refreshRecord(); };
+  return <div className="shell" id="top">
+    <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
+      <a className="brand" href="#top"><Tomb size={20}/>Parable</a>
+      <nav aria-label="Sections">{nav.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
+      <button className="theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+        {theme === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}
+      </button>
     </header>
-    <nav id="page-menu" className={`menu-overlay ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen}>
-      <div className="menu-head"><span>Navigate</span><button className="close-menu" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={26}/></button></div>
-      <div className="menu-links">{nav.map(link => <ScrambleLink key={link.href} label={link.label} href={link.href} onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1} arrow />)}</div>
-      <p>Every strategy has a graveyard. Now you can see it.</p>
-    </nav>
-    <main inert={menuOpen}>
-      {dashboard.info?.offline && <div className="offline-banner" role="status">Offline simulation: trades and identities here are practice data.</div>}
-      {dashboard.error && <div className="engine-error" role="status">Public record unavailable: {dashboard.error}</div>}
-      <ProofBar info={dashboard.info} creator={dashboard.creator}/>
-      <section className="hero">
-        <div className="hero-copy">
-          <span className="live-tag">LIVE · Sepolia + World ID + ENSv2 + Arkiv</span>
-          <h1>Every trading strategy has a graveyard.<br/><span>Parable is where bots can’t lie about theirs.</span></h1>
-          <div className="hero-actions">
-            <ScrambleLink label="Launch a bot" href="#launch" className="main-action" onClick={event => scrollToSection(event, '#launch')} arrow />
-            <ScrambleLink label="See live bots" href="#live" onClick={event => scrollToSection(event, '#live')} arrow />
-            <ScrambleLink label="Graveyard" href="#graveyard" onClick={event => scrollToSection(event, '#graveyard')} arrow />
-          </div>
+    <main>
+      {d.info?.offline && <div className="notice" role="status">Practice mode: this server runs a pretend chain, nothing here is on Sepolia.</div>}
+      {d.error && <div className="notice" role="status">Can’t reach the server right now: {d.error}</div>}
+      <section className="hero" id="hero">
+        <h1 data-reveal>Every trading strategy<br/>has a <em>graveyard.</em></h1>
+        <p className="lede" data-reveal>Bots on Parable never hold the money and never write their own history. A vault does both, so the failures stay visible.</p>
+        <div className="hero-actions" data-reveal>
+          <LinkButton variant="solid" href="#launch">Launch a bot</LinkButton>
+          <LinkButton href="#graveyard" icon={<Tomb size={18}/>}>See the graveyard</LinkButton>
         </div>
+        {d.report && <p className="hero-count" data-reveal>
+          <span className="tiny-graves" aria-hidden="true">{Array.from({ length: Math.min(d.report.dead, 24) }, (_, i) => <Tomb key={i} size={16} style={{ '--i': i } as React.CSSProperties}/>)}</span>
+          {d.report.launched} launched so far · {d.report.dead} in the graveyard
+        </p>}
+        <Facts info={d.info}/>
       </section>
-      <Launch info={dashboard.info} brains={dashboard.brains} onBorn={creator => { dashboard.setCreator(creator); void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
-      <Live bots={dashboard.bots} creator={dashboard.creator} botEvents={dashboard.botEvents} info={dashboard.info} onRefresh={() => { void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
-      <Record graves={dashboard.graves} report={dashboard.report} bots={dashboard.bots} creator={dashboard.creator} info={dashboard.info} recordError={dashboard.recordError}/>
-      <section className="app-section" id="extras">
-        <div className="app-heading">
-          <div>
-            <h2>Extras</h2>
-            <p>AI Swarm oversight, head-to-head Market Arena simulation, and public brain comparison.</p>
-          </div>
-          <span className="section-number">05</span>
-        </div>
-        <div className="extras-stack">
-          <Swarm manager={dashboard.manager} error={dashboard.managerError} onUpdate={dashboard.setManager}/>
+      <Launch info={d.info} brains={d.brains} onBorn={creator => { d.setCreator(creator); refreshAll(); }}/>
+      <Live bots={d.bots} creator={d.creator} botEvents={d.botEvents} info={d.info} onRefresh={refreshAll}/>
+      <Graveyard graves={d.graves} report={d.report} creator={d.creator} recordError={d.recordError}/>
+      <Cheat bots={d.bots}/>
+      <Section id="more" n="05" title="More" intro="Extra tools built on the same record. Open the ones you want.">
+        <div className="more-stack">
+          <Swarm manager={d.manager} error={d.managerError} onUpdate={d.setManager}/>
+          <CompareBrains comparison={d.comparison} recordError={d.recordError}/>
           <Arena/>
-          <CompareBrains comparison={dashboard.comparison} recordError={dashboard.recordError}/>
         </div>
-      </section>
-      <section className="content-section" id="how">
-        <div className="section-heading">
-          <h2>How it works</h2>
-          <p>A bot can request a trade. The ParableVault on Sepolia checks its ENSv2 badge and risk rules, and Arkiv records every birth, trade, and death permanently.</p>
-        </div>
-        <div className="feature-grid">
-          <article><span>01 · World ID</span><h3>One real creator</h3><p>World approval connects each bot to a verified human before launch.</p></article>
-          <article><span>02 · ENSv2 + Vault</span><h3>Clear permissions</h3><p>A soulbound ENSv2 subname gives the bot an identity the Sepolia vault can check and revoke.</p></article>
-          <article><span>03 · Arkiv</span><h3>No hidden losses</h3><p>Arkiv keeps births, trades, and deaths searchable forever, even after a bot dies.</p></article>
-        </div>
+      </Section>
+      <section className="section how" id="how">
+        <h2 data-reveal>How it works</h2>
+        <ol className="how-steps">
+          {steps.map(([Icon, title, text], i) => <li key={title} data-reveal style={{ '--i': i } as React.CSSProperties}>
+            <Icon size={26}/><h3>{title}</h3><p>{text}</p>
+          </li>)}
+        </ol>
       </section>
     </main>
-    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard · Built on Sepolia, World ID, ENSv2 &amp; Arkiv</span><ScrambleLink label="Back to top" href="#top" onClick={event => scrollToSection(event, '#top')}/></footer>
+    <footer><span className="brand"><Tomb size={18}/>Parable</span><span>Built at ETHGlobal Mumbai on Sepolia, World ID, ENS and Arkiv.</span><a href="#top">Back to top</a></footer>
   </div>;
 }

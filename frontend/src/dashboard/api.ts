@@ -39,11 +39,25 @@ export function saveOwner(id: number, token: string): void {
   } catch { /* private browsing */ }
 }
 
-export const usd = (value: number | null | undefined) => value == null ? 'Unavailable' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value / 1_000_000);
-export const pct = (value: number | null | undefined) => value == null ? 'Unavailable' : `${value > 0 ? '+' : ''}${(value / 100).toFixed(1)}%`;
-export const brainName = (value: string) => value === 'rule' ? 'Simple rule (no AI)' : value.startsWith('gemini:') || value.startsWith('gemma:') ? value.split(':')[1] : value;
-export const causeName = (value: string) => ({ expired: 'Lease ran out', killed: 'Stopped by creator', loss_limit: 'Hit its loss limit (vault killed it)' })[value as 'expired' | 'killed' | 'loss_limit'] || value;
-const vaultErrors: Record<string, string> = {
-  OverTradeLimit: 'This trade exceeds the bot’s limit.', NotBot: 'This wallet is not a registered bot.', BadgeInvalid: 'The bot’s identity badge is invalid.', StalePrice: 'The price is too old.', NotOverLimit: 'The loss limit has not been reached.', CreatorIdentityMismatch: 'This identity belongs to a different creator.', NotAlive: 'This bot is no longer active.', Expired: 'This bot’s lease has ended.', NotExpired: 'This bot’s lease is still active.', InsufficientBalance: 'The vault has insufficient funds.', Unauthorized: 'This action is not authorized.', UnknownError: 'The vault rejected the action.'
+export const usd = (value: number | null | undefined) => value == null ? '—' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value / 1_000_000);
+// Basis points to a percent with one decimal (1 bps = 0.01%). Anything that rounds to zero shows as plain 0.0%.
+export const pct = (value: number | null | undefined) => {
+  if (value == null) return '—';
+  const rounded = Math.round(value / 10) / 10;
+  return rounded === 0 ? '0.0%' : `${rounded > 0 ? '+' : ''}${rounded.toFixed(1)}%`;
 };
-export const explain = (reason: string) => vaultErrors[reason] ? `${reason}: ${vaultErrors[reason]}` : reason;
+/** 'up' or 'down' for coloring a return; tiny moves that show as 0.0% get no color. */
+export const trend = (bps: number | null | undefined) => Math.round((bps || 0) / 10) > 0 ? 'up' : Math.round((bps || 0) / 10) < 0 ? 'down' : '';
+export const brainName = (value: string) => value === 'rule' ? 'Simple rule (no AI)' : value === 'unknown' ? 'Unknown brain' : value.includes(':') ? value.split(':')[1] : value;
+export const causeName = (value: string) => ({ expired: 'Its time ran out', killed: 'Stopped by its creator', loss_limit: 'Lost too much, the vault ended it' })[value as 'expired' | 'killed' | 'loss_limit'] || value;
+// What each vault refusal means, in one plain sentence.
+const vaultErrors: Record<string, string> = {
+  OverTradeLimit: 'that trade is bigger than the bot is allowed.', NotBot: 'this wallet isn’t a registered bot.', BadgeInvalid: 'the bot’s name tag is no longer valid.',
+  StalePrice: 'the price is too old to trade on.', NotOverLimit: 'the bot hasn’t lost enough to be stopped.', CreatorIdentityMismatch: 'this person already has a different wallet.',
+  NotAlive: 'this bot has already stopped.', Expired: 'this bot’s time is up.', NotExpired: 'this bot still has time left.', InsufficientBalance: 'the bot doesn’t have that much.',
+  Unauthorized: 'only the creator can do that.', BotOutOfGas: 'the bot has no test ETH left for fees.', UnknownError: 'the vault refused.',
+};
+export const explain = (reason: string) => {
+  const text = vaultErrors[reason];
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : reason;
+};
