@@ -6,6 +6,21 @@
 Built from scratch at **ETHGlobal Mumbai 2026** (Nov 5–7, 2026).
 *(Pre-hackathon disclosure: Only generic rules/sponsor notes in `AGENTS.md` existed before hacking started at 2026-11-05 21:00 IST. All contracts, backend, frontend, schemas, and tests were built during the hackathon. See [`AI_USAGE.md`](AI_USAGE.md).)*
 
+**Try it:** https://parable-demo.centralindia.cloudapp.azure.com · **Video script:** [`docs/VIDEO_SCRIPT.md`](docs/VIDEO_SCRIPT.md) · **Benchmark:** [`docs/BENCHMARK.md`](docs/BENCHMARK.md) · **Deploy + MCP:** [`docs/DEPLOY.md`](docs/DEPLOY.md)
+
+### What you can do on the site (all live on Sepolia)
+| Section | What happens | How you can check it yourself |
+|---|---|---|
+| **01 Launch** | One sentence: pick strategy, brain, money, limits, lifetime. Approve with **World ID** (or "Demo · no phone": no human check, bot marked *demo*). Six real steps tick by: wallet → fee money → ENS name → vault → Arkiv. | Birth tx on Etherscan, ENS name, Arkiv record |
+| **02 Running** | Each bot's value, time left and history. **Jev** brains show their odds ("buy 87% · hold 10% · sell 3%") and size trades by confidence. | Every trade links to its Sepolia tx |
+| **03 Register** | Every bot that ever died, struck through, with trades, lifetime, return and how it ended. The vault's own count must equal the list. | Each row links to its **read-only Arkiv entity** and its vault tx |
+| **04 Try to hide a loser** | Three cheats (stranger trades, 10× limit, same person new wallet) are dry-run on the **real vault** (eth_call). | The vault's error code + a copyable `cast call` that reproduces it |
+| **05 Swarm** | Pick a **mind** model and a cart of workers; one approval launches them; the mind checks every minute (a safety rule overrides it). | Every decision logged with who decided |
+| **06 Benchmarks + Telemetry** | Live charts (value at market vs the vault's official value, ETH market vs Chainlink), brain comparison, practice arena (labelled simulation). Telemetry slides down from the top bar. | "Check it yourself" box: Etherscan, Arkiv, ENS links + commands |
+| **MCP** | 14 tools so Claude Code / Codex / Cursor can launch, inspect, cheat-test and stop bots on the same server. | Tested 3 rounds × 10 tools live, 30/30 OK |
+
+**Brains:** Jev (Autoloops: Gemma 4 31B, DeepSeek V4.1 Flash), Gemini 3.5 / 3.1 Flash-Lite, the simple rule. Claude Haiku/Sonnet/Opus 5.5 are wired in and appear once the Anthropic account has credit.
+
 ---
 
 ## 1. The Problem: Survivorship Bias in AI Trading
@@ -93,7 +108,7 @@ Anyone selling or showcasing an AI trading agent today can play a simple trick: 
 
 ---
 
-## 5. How to Run Locally & Run the 182 Automated Tests
+## 5. How to Run Locally & Run the Tests (167 Python + 39 Solidity + 8 frontend)
 
 ### Run the Test Suites (143 Python + 39 Foundry Solidity Tests = 182 Tests)
 ```bash
@@ -135,6 +150,8 @@ cd contracts && forge test
   - **Operator bridges World ID OIDC to `registerBot`:** World ID is validated server-side via OIDC + PyJWT before the operator calls `registerBot`; verifying a World ID ZK proof directly inside `registerBot` is the next upgrade.
   - **In-memory bot keys by design:** Bot private keys live only in server RAM. If the server restarts, running bots simply stop trading and expire into the graveyard once their lease ends (`repair.py` reconciles any gap between `ParableVault` and Arkiv every 60 seconds).
   - **Code fingerprint (`code_hash`) is a commitment:** Proves which strategy/brain configuration was committed to the ENSv2 badge at birth; proving remote execution requires a TEE.
+  - **Demo approval** (optional, rate-limited, off unless `WORLD_ALLOW_DEMO=1`) skips the human check; such bots are marked *demo* in their Arkiv record and on the register.
+  - **Live graphs are in memory** and start fresh when the server restarts; the "at market price" view (Coinbase) is for comparison only, the vault always scores at Chainlink.
   - **Flat testnet price → small signal nudges for decisions only:** Sepolia's Chainlink ETH/USD feed updates about once an hour. So that a 10-minute demo bot has something to react to, the bot's *decision input* gets small ±0.1–0.25% nudges when the price hasn't moved. **Every trade still settles inside the vault at the real Chainlink price**, and the vault alone measures profit and loss, so no score can be faked. On mainnet (fast-updating feeds) the nudge is unnecessary.
   - **Market Arena is a simulation:** the `#arena` benchmark replays scripted market regimes against an in-memory copy of the vault rules. It is clearly separate from the real Sepolia bots and never touches the real vault or Arkiv counts.
 
