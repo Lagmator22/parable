@@ -219,6 +219,9 @@ def read_state(bot_id: int, rules: BotRules, history: list[int]) -> tuple[dict, 
     """Collect everything the decision needs from the vault. Returns (state, raw bot record)."""
     bot = vault.get_bot(bot_id)
     oracle = vault.price()
+    if not history:
+        # Seed two reference points on tick 1 so momentum/dip_buyer and AI brains can trade immediately at birth.
+        history.extend([oracle, signal_price(oracle, [oracle])])
     history.append(signal_price(oracle, history))
     state = {
         "strategy": rules.strategy, "history": history[-12:], "price": oracle,

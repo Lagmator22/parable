@@ -82,26 +82,26 @@ Partners (max 3): **ENS · Arkiv · World**. Trades are priced by Chainlink's ET
 ## 5. Sponsor checklists (tick only with evidence; see `JUDGING.md`)
 
 **ENS: Best Use of ENSv2** ($3k / $2k / $1k / $1k)
-- [ ] Built on ENSv2 on Sepolia; ENS is central (vault reads the badge on every trade)
-- [ ] Subnames: expiring + revocable (we keep the unregister role) + soulbound (transfer-admin role withheld). Bot may edit only `status`.
-- [ ] Agents as namespaces (bonus)
-- [ ] No hard-coded values; live demo link; open-source repo
+- [x] Built on ENSv2 on Sepolia; ENS is central (vault reads the badge on every trade)
+- [x] Subnames: expiring + revocable (we keep the unregister role) + soulbound (transfer-admin role withheld). Bot may edit only `status`.
+- [x] Agents as namespaces (bonus)
+- [x] No hard-coded values; live demo link; open-source repo
 
 **Arkiv: Build on Arkiv** ($3k / $1k)
-- [ ] Writes to the Arkiv testnet (Python SDK or JSON-RPC); the dashboard **reads** the graveyard and report cards from Arkiv
-- [ ] README: writer wallet address(es) and one query anyone can run
-- [ ] `/arkiv/schema.md`, `/arkiv/friction.md`, `/arkiv/reach.md`, `/arkiv/why-arkiv.md`, `/arkiv/how-you-use-arkiv.md`
-- [ ] Open-source license; AI usage stated
+- [x] Writes to the Arkiv testnet (Python SDK or JSON-RPC); the dashboard **reads** the graveyard and report cards from Arkiv
+- [x] README: writer wallet address(es) and one query anyone can run
+- [x] `/arkiv/schema.md`, `/arkiv/friction.md`, `/arkiv/reach.md`, `/arkiv/why-arkiv.md`, `/arkiv/how-you-use-arkiv.md`
+- [x] Open-source license; AI usage stated
 - Why Arkiv: anyone, or any app, can query any creator's graveyard without asking us. Alive-bot records **expire with the bot's lease** (natural use of expiry). Death records live long. Filters match real questions (creator, strategy, cause of death, profit/loss).
 
 **World: World ID Agent Pass** ($2.5k / $1.5k / $1k). IDKit (2 × $1.25k) is the same partner pick, so apply to both if eligible.
-- [ ] Full journey: request → human completes → server validates → protected action (bot is born)
-- [ ] Denied / expired / cancelled path → no bot is born
-- [ ] Validation on our server; no secrets in the browser
-- [ ] Integration debrief: time to first success, friction, missing docs, top improvement
+- [x] Full journey: request → human completes → server validates → protected action (bot is born)
+- [x] Denied / expired / cancelled path → no bot is born
+- [x] Validation on our server; no secrets in the browser
+- [x] Integration debrief: time to first success, friction, missing docs, top improvement
 
 **ETHGlobal (all)**
-- [ ] Steady commits · `AI_USAGE.md` kept up to date · README pre-hackathon disclosure
+- [x] Steady commits · `AI_USAGE.md` kept up to date · README pre-hackathon disclosure
 - [ ] Video 2–4 min, ≥720p, own voice, not on a phone, no TTS
 - [ ] Repo **public** before submitting · select ENS + Arkiv + World
 

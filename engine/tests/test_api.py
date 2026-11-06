@@ -220,3 +220,20 @@ def test_swarm_manager_and_mcp_tools(client):
     assert mcp_server.report_card(creator_id=bot["creator_id"])["launched"] == 1
     assert mcp_server.bot_events(bot["bot_id"])[0]["kind"] in ("birth", "rejected", "trade")
     assert len(mcp_server.compare_brains()) >= 1
+    # Verify ERC-8004 export + TUI scoreboard include living and dead agents.
+    from parable.erc8004 import render_tui
+
+    feed = c.get("/api/erc8004").json()
+    assert feed["standard"] == "ERC-8004" and feed["totalAgents"] >= 1
+    assert "ERC-8004 AGENT & GRAVEYARD REGISTRY" in render_tui(feed)
+
+
+def test_market_arena_benchmark_crashes_and_rallies(client):
+    c, _, _ = client
+    crash = c.get("/api/arena").json()
+    assert crash["scenario"]["id"] == "flash_crash"
+    assert crash["summary"]["killed_by_vault"] >= 1 and crash["summary"]["survived"] >= 1
+    assert any(b["blocked"] >= 1 for b in crash["contenders"])
+    bull = c.post("/api/arena/run", json={"scenario": "bull_breakout", "live_llm": False}).json()
+    assert bull["scenario"]["id"] == "bull_breakout"
+    assert bull["summary"]["profitable"] >= 1 and bull["summary"]["best_pnl_bps"] > 0

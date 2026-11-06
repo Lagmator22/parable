@@ -354,10 +354,9 @@ def test_flat_oracle_price_adds_signal_ticks_so_momentum_and_dip_buyer_trade(mon
     monkeypatch.setattr(B.vault, "price", lambda: PRICE)
     monkeypatch.setattr(B.vault, "equity", lambda i: 50_000_000)
     history = []
-    for _ in range(3):
-        state, _ = B.read_state(1, RULES, history)
+    state, _ = B.read_state(1, RULES, history)
     assert state["price"] == PRICE  # the vault still trades at the real Chainlink price
-    assert len(set(history)) == 3  # signal history moves so rules don't sit on HOLD
+    assert len(set(history)) == 3  # seeded on tick 1 so bots trade immediately at birth
     assert B.rule_decide(state).action == "buy"
     assert B.rule_decide({**state, "strategy": "dip_buyer"}).action == "buy"
     # When the real Chainlink price moves, signal_price uses it directly.

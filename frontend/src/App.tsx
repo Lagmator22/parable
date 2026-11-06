@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Moon, Sun, X } from 'lucide-react';
 import { ScrambleButton, ScrambleLink } from './components/ui/ScrambleButton';
+import { Arena } from './dashboard/Arena';
 import { Launch } from './dashboard/Launch';
 import { Live } from './dashboard/Live';
 import { ProofBar } from './dashboard/ProofBar';
@@ -10,7 +11,7 @@ import { Swarm } from './dashboard/Swarm';
 import { useDashboard } from './dashboard/useDashboard';
 
 type Theme = 'dark' | 'light';
-const nav = [{ label: 'Home', href: '#top' }, { label: 'Launch', href: '#launch' }, { label: 'Live bots', href: '#live' }, { label: 'AI Swarm', href: '#swarm' }, { label: 'Graveyard', href: '#graveyard' }, { label: 'Compare brains', href: '#compare' }, { label: 'Test the vault', href: '#proof' }, { label: 'How it works', href: '#how' }];
+const nav = [{ label: 'Home', href: '#top' }, { label: 'Launch', href: '#launch' }, { label: 'Live bots', href: '#live' }, { label: 'AI Swarm', href: '#swarm' }, { label: 'Market Arena', href: '#arena' }, { label: 'Graveyard', href: '#graveyard' }, { label: 'Compare brains', href: '#compare' }, { label: 'Test the vault', href: '#proof' }, { label: 'How it works', href: '#how' }];
 
 function savedTheme(): Theme {
   try { return localStorage.getItem('parable-theme') === 'light' ? 'light' : 'dark'; }
@@ -100,6 +101,7 @@ export default function App() {
       <Launch info={dashboard.info} brains={dashboard.brains} onBorn={creator => { dashboard.setCreator(creator); void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
       <Live bots={dashboard.bots} creator={dashboard.creator} latestEvents={dashboard.latestEvents} onRefresh={() => { void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
       <Swarm manager={dashboard.manager} error={dashboard.managerError} onUpdate={dashboard.setManager}/>
+      <Arena/>
       <Record graves={dashboard.graves} report={dashboard.report} comparison={dashboard.comparison} bots={dashboard.bots} creator={dashboard.creator} info={dashboard.info} recordError={dashboard.recordError}/>
       <section className="content-section" id="how">
         <div className="section-heading"><h2>Bots don’t keep<br/>their own score.</h2><p>A bot can request a trade. The vault decides whether it is allowed, holds the practice money, and records what happened.</p></div>

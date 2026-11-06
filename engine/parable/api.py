@@ -16,8 +16,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from parable import world_pass
+from parable.arena import MarketArena
 from parable.bot_runner import PRESETS, available_brains, code_fingerprint
 from parable.config import get_settings
+from parable.erc8004 import build_erc8004_feed
 from parable.launcher import (ApprovalDenied, ApprovalPending, Launcher, LaunchError, LaunchFailed, real_backends,
                               to_bytes32)
 from parable.manager import SwarmManager
@@ -29,6 +31,7 @@ EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
 log = logging.getLogger("parable.api")
 _launcher: Launcher | None = None
 _manager: SwarmManager | None = None
+_arena = MarketArena()
 
 
 def offline() -> bool:
@@ -297,6 +300,27 @@ def manager_status():
 @app.post("/api/manager/start")
 def manager_start(req: ManagerRequest = ManagerRequest()):
     return get_manager().start(count=req.bots, minutes=req.minutes, spawn_offline=offline())
+
+
+@app.get("/api/erc8004")
+def erc8004_feed():
+    """ERC-8004 agent registration + reputation feed (including graveyard deaths)."""
+    return build_erc8004_feed(get_launcher())
+
+
+class ArenaRequest(BaseModel):
+    scenario: str = "flash_crash"
+    live_llm: bool = True
+
+
+@app.get("/api/arena")
+def arena_status():
+    return _arena.get_or_run()
+
+
+@app.post("/api/arena/run")
+def arena_run(req: ArenaRequest = ArenaRequest()):
+    return _arena.run(req.scenario, use_live_llm=req.live_llm)
 
 
 @app.get("/")
