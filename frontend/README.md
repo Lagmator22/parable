@@ -1,18 +1,20 @@
 # Parable frontend
 
-This folder contains the website. It is a static React app that the Python engine can serve after a build.
+The dashboard is a React app built with Vite. FastAPI serves the production bundle from `frontend/dist/`.
 
-From `~/ethglobal/parable/frontend`:
+For local development, start the engine in one terminal from the repo root:
 
-```sh
-npm install
+```bash
+cd engine
+PARABLE_OFFLINE=1 WORLD_MOCK=1 uv run uvicorn parable.api:app --port 8000
+```
+
+In another terminal from the repo root:
+
+```bash
+cd frontend
+npm ci
 npm run dev
 ```
 
-Open the printed local URL. To make the production files, run `npm run build`; they appear in `frontend/dist/`.
-
-The React page includes the landing, theme switch, and one shared menu for Launch, Live bots, Graveyard, Compare brains, and Try to cheat. All sections use relative API routes described in `../internal/FRONTEND_CONTRACT.md`.
-
-The main experience is served at `/` after `npm run build`. The backend's older page remains at `/classic` as a fallback, but the React menu and launch button stay on `/`.
-
-For a public Vercel frontend and live Python engine, follow [DEPLOY_VERCEL.md](./DEPLOY_VERCEL.md).
+Open the URL printed by Vite. The development server proxies API and approval requests to the local engine. Run `npm test` and `npm run build` from `frontend/` to test and build the site.

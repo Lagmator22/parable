@@ -1,13 +1,11 @@
 # Parable on Arkiv
 
-**In one minute:** every bot's birth, every trade, every refusal and every death is written to Arkiv as a public
-record. Our server can add records but the bot's creator cannot pick which ones get shown, and a dead bot's
-grave stays queryable by anyone. That is what makes the graveyard impossible to hide.
+Parable writes bot registrations, trades, refusals and deaths to Arkiv Rabdi. The public dashboard reads these records for the Graveyard, bot history and model comparison. Readers can query the same writer and vault directly using the command in the [main README](../README.md#query-the-public-record).
 
-| File | What it answers |
+| Document | Contents |
 |---|---|
-| [schema.md](schema.md) | What we store, the attribute names, and a query you can run yourself |
-| [how-you-use-arkiv.md](how-you-use-arkiv.md) | Each Arkiv feature we use and what it does for the user |
-| [why-arkiv.md](why-arkiv.md) | What users would lose if this were a normal database |
-| [reach.md](reach.md) | Who would use it and what comes next |
-| [friction.md](friction.md) | Honest feedback for the Arkiv team from building on Rabdi |
+| [Schema](schema.md) | Entities, indexed fields, owner and retention |
+| [Integration](how-you-use-arkiv.md) | How Arkiv features appear in the dashboard |
+| [Why Arkiv](why-arkiv.md) | Independent reads, record permissions and data kept off Arkiv |
+| [Reach](reach.md) | Intended users, live demo and next steps |
+| [Friction](friction.md) | Reproducible issues and feedback for Arkiv |

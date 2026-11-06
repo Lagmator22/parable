@@ -1,234 +1,28 @@
-# Parable: how it works (pictures only, simple words)
+# Architecture
 
-> **Parable in one line:** AI trading bots can't hide their failures here, because the bots never touch the money and never write their own record.
-
-**Words used below**
-- **Bot:** a small AI program that decides "buy", "sell" or "wait".
-- **Vault:** a program on the blockchain that holds the money and keeps score. Nobody can secretly change it.
-- **Badge:** the bot's name tag, e.g. `bot-07.parable.eth` (made with **ENS**). It has an expiry date and can be taken away.
-- **Public record:** a shared notebook anyone can read (made with **Arkiv**).
-- **World ID:** proof that the creator is one real, unique person.
-- **Practice network (Sepolia):** a blockchain with fake money, used for testing.
-
----
-
-## 1. The big picture
-```
-   You (website)          or       Your AI assistant (Claude Code / Codex)
-          \                                  /
-           ▼                                ▼
-     ┌─────────────────────────────────────────────┐
-     │        PARABLE ENGINE (Python program)       │
-     │   launches bots · runs them · ends them      │
-     └──┬────────────┬──────────────┬───────────┬──┘
-        ▼            ▼              ▼           ▼
-   World ID       ENS badge       VAULT       Arkiv
-   "is this a     "name tag       "holds the  "public
-    real person?"  with rules"     money,      notebook of
-                                   keeps       every bot,
-                                   score"      dead or alive"
+```mermaid
+flowchart LR
+  Browser["Dashboard"] --> API["FastAPI engine"]
+  Client["MCP client"] --> MCP["Parable MCP server"] --> API
+  API --> World["World ID approval"]
+  API --> Runner["Bot runners and swarm supervisor"]
+  API --> ENS["ENSv2 badge registry"]
+  Runner --> Vault["Sepolia vault"]
+  Vault --> Oracle["ENSv2 badge oracle"] --> ENS
+  Vault --> Feed["Chainlink ETH/USD"]
+  API --> Bridge["Arkiv SDK bridge"] --> Arkiv["Arkiv Rabdi"]
+  Vault -. "Lifecycle events for repair" .-> API
 ```
 
-## 2. A bot's life (from birth to the graveyard)
-```
-  Creator clicks "Launch bot"
-            │
-            ▼
-  World ID: "Do you approve this bot?" ──── No ───▶ no bot is born (stop)
-            │ Yes
-            ▼
-  ENS gives it a name tag: bot-07.parable.eth  (expires in 1 hour, can't be sold)
-            │
-            ▼
-  Vault writes it down: "bot-07 is born, has $100, may lose at most 10%"
-            │
-            ▼
-  Public notebook (Arkiv): "bot-07 born" ← anyone can read this
-            │
-            ▼
-  ┌──── Bot loop (every few seconds) ────────────────────┐
-  │  look at ETH price → AI decides buy / sell / wait     │
-  │  → asks the vault to trade → vault checks the rules   │
-  │  → trade recorded in the notebook                     │
-  └───────────────────────────────────────────────────────┘
-            │
-            ▼  the bot dies when ONE of these happens:
-     time runs out · creator stops it · it lost too much
-            │
-            ▼
-  Name tag taken away · Vault marks it dead · Notebook: "bot-07 died"
-            │
-            ▼
-  🪦 It stays in the GRAVEYARD forever. Nobody can delete it.
-```
+1. The engine validates a World ID approval for the pending launch, creates a bot wallet, issues an ENSv2 badge and registers the bot in the vault. The demo approval path creates a labeled demo record.
+2. The runner asks its configured model or rule for a decision. The vault checks the bot, its badge, its lease, the trade cap and the price feed before accepting the order. It values the bot's position and applies the loss limit.
+3. The engine writes lifecycle records through the Arkiv SDK bridge. It retries failed writes and checks the vault for missing bot and death records. Arkiv serves the public history, while the vault supplies the independent count and transaction evidence.
 
-## 3. What the vault checks before every trade
-```
-  Bot asks: "Please buy $20 of ETH"
-            │
-            ▼
-   Is this bot registered?        ── no ──▶ ❌ BLOCKED
-            │ yes
-   Is it still alive and not expired? ── no ──▶ ❌ BLOCKED
-            │ yes
-   Is its name tag still valid?   ── no ──▶ ❌ BLOCKED
-            │ yes
-   Is $20 within its limit?       ── no ──▶ ❌ BLOCKED
-            │ yes
-   Is the price fresh (Chainlink)? ── no ──▶ ❌ BLOCKED
-            │ yes
-            ▼
-   ✅ Trade done at the real price
-            │
-   Lost more than its limit now?  ── yes ──▶ 🪦 bot dies automatically
-```
+## Trust and scope
 
-## 4. Why nobody can hide a loser
-```
-  Cheating trick                         What Parable does
-  ─────────────────────────────────      ───────────────────────────────────
-  "Run secret bots, show only winners"   Bots can't trade unless registered first
-  "Delete the losing bot"                Deaths are written by the vault, not by you
-  "Make a new account, start fresh"      One real person = one account (World ID)
-  "Lie about profits"                    The vault measures profit itself, at the real price
-```
+- The engine controls bot signing keys and verifies World ID. The vault enforces the creator-to-wallet binding from the verified registration. The contract can enforce a loss limit or lease expiry independently of the runner.
+- The vault keeps each bot's practice balance and executes at the Chainlink price. It does not place exchange orders. The Practice Arena uses separate simulated balances and prices.
+- Arkiv reads are scoped by writer and vault. Events and graves are read-only after writing and have finite retention. A count match checks completeness at the bot level. It does not verify every event.
+- Bot keys and live charts are held in memory. A server restart stops existing runners. The repair process can record the bots' eventual expiry from the vault.
 
-## 5. Where each piece lives
-```
-  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-  │ Practice blockchain  │  │ Arkiv network        │  │ Your laptop / server │
-  │ (Sepolia)            │  │                      │  │                      │
-  │  • Vault             │  │  • bot records       │  │  • Parable engine    │
-  │  • ENS name tags     │  │  • trades, deaths    │  │  • website           │
-  │  • Chainlink price   │  │  • report cards      │  │  • bots (AI loops)   │
-  └──────────────────────┘  └──────────────────────┘  └──────────────────────┘
-```
-
-*Diagrams are updated after every build phase.*
-
----
-
-## 6. What is built so far (after Phase 2), and which file does what
-```
-                         YOUR BROWSER  (dashboard: engine/parable/static/)
-                         Launch · Live bots · 🪦 Graveyard · Report card · Try to cheat
-                                        │  (asks every 3 seconds)
-                                        ▼
-  ┌──────────────────────────────────────────────────────────────────────────────┐
-  │ api.py        the web server: receives button clicks, sends back results     │
-  │   │                                                                          │
-  │   ▼                                                                          │
-  │ launcher.py   the "manager": runs the launch steps in order, ends bots,      │
-  │               copies every death from the vault into the graveyard           │
-  │   │                                                                          │
-  │   ├─▶ world_pass.py  asks World ID "is this a real person, do you approve?"  │
-  │   ├─▶ ens_badge.py   makes / reads / removes the bot's name tag (ENS)        │
-  │   ├─▶ vault.py       talks to the vault contract on the practice blockchain  │
-  │   ├─▶ arkiv_store.py writes / reads the public notebook (Arkiv)              │
-  │   │        │                                                                 │
-  │   │        ▼                                                                 │
-  │   │   arkiv-bridge/  tiny helper program using Arkiv's official tool (JS SDK)│
-  │   │                                                                          │
-  │   └─▶ bot_runner.py  the bot's brain loop: price → AI decides → ask to trade │
-  │                       (AI down or confused? → simple backup rule)            │
-  │                                                                              │
-  │ fake_chain.py  a pretend vault/ENS/Arkiv for practice when the internet or   │
-  │                keys are missing. The page then shows "OFFLINE SIMULATION".   │
-  └──────────────────────────────────────────────────────────────────────────────┘
-                                        │
-                                        ▼
-               contracts/src/ParableVault.sol   (the vault: holds money, keeps score)
-               contracts/src/adapters/EnsV2BadgeOracle.sol (lets the vault check name tags)
-```
-
-## 7. Launching a bot, with the safety locks
-```
-  You click "Launch"
-        │
-        ▼
-  Server makes a launch ticket:  launch id + secret claim code (only YOUR browser gets the code)
-        │
-        ▼
-  World ID page opens ──▶ accepts ONLY launch ids the server made (fake ids → refused)
-        │  you approve
-        ▼
-  Your browser says "confirm" + claim code ──▶ wrong code → refused (nobody can steal your approval)
-        │
-        ▼
-  New bot wallet → a little test ETH for fees → ENS name tag → vault registers it → notebook "born"
-        │
-        ▼
-  Bot loop starts
-```
-
-## 7b. Who is allowed to do what (security locks)
-```
-  Action                     Who can do it                 How we check
-  ─────────────────────────  ────────────────────────────  ───────────────────────────────────────
-  Approve a launch           only the person who started   secret claim code kept in their browser
-  Kill a bot                 only its creator              same secret code (owner token)
-  "Check loss" / "Expire"    ANYONE                        the vault only agrees if the rule is truly met
-  Write to the notebook      only Parable's server         Arkiv helper needs a password + local only
-  See error details          nobody (only the server log)  users see just the rule name, e.g. OverTradeLimit
-```
-
-## 8. Holes we know about, and how we'll fix them (improvement pipeline)
-| # | Hole (plain words) | How bad | Fix / plan |
-|---|---|---|---|
-| 1 | ~~Nothing has run on a real blockchain yet~~ Vault deployed, ENS + Arkiv + World each proven live | ✅ Done | See DEPLOYMENTS.md |
-| 2 | ~~Contract tests never ran~~ | ✅ Done | 39 Foundry tests pass |
-| 3 | First real launch failed: two helpers used the same transaction number; dashboard overloaded Arkiv | ✅ Fixed | Section 10 below: post office, cache, outbox, repair |
-| 4 | Parable's server is trusted to say "this creator passed World ID" when it registers a bot | 🟡 Known limit | Say it honestly in README; stretch: check World proof on-chain |
-| 5 | The vault's "best score so far" only updates when the bot trades | 🟡 Small | Fine for demo; note in README |
-| 6 | If the server restarts, running bots lose their keys (kept in memory only, on purpose) and simply expire | 🟡 Small | Document; short leases for demo |
-| 7 | World approvals are kept in memory: a restart forgets pending launches | 🟡 Small | Fine for demo |
-| 8 | Each bot needs 0.003 test ETH for fees, so the operator wallet must hold enough | 🟡 Small | Keep ~0.1 Sepolia ETH in the operator wallet |
-| 9 | Sepolia's Chainlink price updates about once an hour | ✅ Fixed | MAX_PRICE_AGE = 7200 s; when the oracle is flat between hourly updates, the bot brain gets small signal ticks so `momentum` and `dip_buyer` still trade (the vault always settles at the real Chainlink price) |
-| 10 | "Unregistered bot" demo shows `NotBot`; clearer to also show `NotRegistered` | 🟢 Polish | Add a second cheat button |
-| 11 | ~~MCP (Claude Code / Codex access) and the Opus manager are not started~~ | ✅ Done | `mcp_server.py` (7 tools), `manager.py` (`/api/manager`), and `code_hash` fingerprint on ENSv2 badges all built and tested |
-
-## 9. Bot brains
-Each bot is launched with one "brain" (the thing that decides buy, sell or hold). The report card can then compare brains fairly.
-```
-  Launch form: pick a brain ──▶ server checks it is set up (no key / model? → refused)
-        │
-        ▼
-  Every 30 seconds the bot asks its brain:
-     rule    free built-in rule ............ always works
-     claude  Anthropic (needs key)
-     gemini:<model>  one brain per Gemini model ┐ same Google key,
-     gemma:<model>   one brain per Gemma model  ┘ listed in .env
-     local   your own computer (Ollama), no key
-        │
-        ├── brain answers fine ──▶ trade (AI answers in plain dollars; size cut down to the safe limit)
-        └── brain fails, times out (30 s) or answers nonsense ──▶ the free rule decides instead,
-                                                note starts with "[fallback:rule]"
-        ▼
-  Vault checks the real limits anyway ──▶ every bot record and grave remembers its brain
-        ▼
-  Dashboard "Compare brains" table: launched / dead / profitable / worst loss / average, per brain
-```
-
-## 10. After the first real launch: three safety nets
-```
-  1. THE POST OFFICE (tx_sender.py)
-     vault helper ─┐                       one queue per wallet; remembers the last ticket number,
-     ENS helper   ─┼──▶  📮 post office ──▶ so two letters never get the same number
-     gas top-ups  ─┘                       (a clash = "replacement transaction underpriced")
-
-  2. THE OUTBOX (repair.py)
-     vault says "bot born" ✅ ──▶ write to Arkiv ── fails? ──▶ 📥 outbox ──▶ retried every 5 s
-     (the launch still succeeds: the vault already has the bot, the notebook catches up)
-
-  3. THE REPAIR WALK (repair.py, once a minute)
-     for every bot id the vault ever made (1, 2, 3 ...):
-        no notebook record?      ──▶ rebuild it from the vault's own data
-        lease over, still alive? ──▶ expire it (anyone may)
-        dead but no grave?       ──▶ write the grave
-     ⇒ even a crash can't leave a hidden bot. The vault is the boss; Arkiv copies it.
-
-  Less load on Arkiv: answers cached 8 s · brain table = 1 call (was 12) · page pauses when hidden
-  Clean rows: every row carries the vault's address, so old test rows never show up
-```
-
-*Status: 143 Python + 39 contract tests pass (182 total). Core + Stretch #1 (MCP) + Stretch #2 (Swarm Manager) + Stretch #3 (Code Fingerprint) + all Arkiv/World/ENS docs complete.*
+[Vault contract](../contracts/src/ParableVault.sol)  /  [Launch flow](../engine/parable/launcher.py)  /  [Arkiv repair](../engine/parable/repair.py)

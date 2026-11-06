@@ -1,18 +1,19 @@
-# Brain benchmark (run Sat 7 Nov 2026, 00:25 IST)
+# Model response benchmark
 
-Every brain answered the same 6 market situations (steady rise, steady fall, sharp dip, flat, spike then crash, low cash).
-Real API calls; script: `cd engine && uv run python ../scripts/brain_benchmark.py`. A "valid" answer is a well-formed
-buy/sell/hold decision; anything else (error, rate limit, garbage) would make the bot fall back to the simple rule.
+On 7 November 2026, Parable sent six fixed market scenarios to each configured model using real API calls. The scenarios covered a steady rise, steady fall, sharp dip, flat market, spike followed by a crash, and low cash. A valid answer was a parseable buy, sell or hold decision. The table shows the models that returned valid decisions in all six scenarios, plus the rule baseline.
 
-| Brain | Valid | Avg time | Notes |
-|---|---|---|---|
-| Jev · Gemma 4 31B (Autoloops) | 6/6 | 1.5 s | Returns probabilities; trade size follows confidence |
-| Jev · DeepSeek V4.1 Flash (Autoloops) | 6/6 | 1.5 s | Cautious: holds in 4 of 6 situations |
-| Gemini 3.5 Flash-Lite | 6/6 | 7.3 s | |
-| Gemini 3.1 Flash-Lite | 6/6 | 5.6 s | |
-| Simple rule (no AI) | 6/6 | 0 s | Baseline |
-| Gemini 3.6 / 3.5 / 3 Flash Preview / 2.5 Flash | 0–2/6 | — | Free-tier rate limits (HTTP 429) |
-| Gemma 4 31B / 26B via Google API | 1–2/6 | 14–18 s | Google HTTP 500s and timeouts |
-| Claude Haiku / Sonnet / Opus 5.5 | 0/6 | — | Account has no credit; hidden on the site |
+| Model | Valid responses | Mean response time |
+|---|---:|---:|
+| Gemma 4 31B (Jev) | 6/6 | 1.5 s |
+| DeepSeek V4.1 Flash (Jev) | 6/6 | 1.5 s |
+| Gemini 3.1 Flash-Lite | 6/6 | 5.6 s |
+| Gemini 3.5 Flash-Lite | 6/6 | 7.3 s |
+| Simple rule | 6/6 | Under 0.1 s |
 
-The live demo uses only the brains that answered 6/6.
+This small run measures response validity and latency. Profitability requires a separate test. The dashboard's model comparison includes stopped bots and shows average and worst vault returns. Its Practice Arena runs simulated market scenarios.
+
+To repeat the response test with your configured providers, run from the repo root:
+
+```bash
+(cd engine && uv run python ../scripts/brain_benchmark.py)
+```
