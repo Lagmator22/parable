@@ -237,3 +237,11 @@ def test_market_arena_benchmark_crashes_and_rallies(client):
     bull = c.post("/api/arena/run", json={"scenario": "bull_breakout", "live_llm": False}).json()
     assert bull["scenario"]["id"] == "bull_breakout"
     assert bull["summary"]["profitable"] >= 1 and bull["summary"]["best_pnl_bps"] > 0
+
+
+def test_all_graves_view_lists_every_creator(client):
+    c, world, _ = client
+    bot = launch(c, world)
+    c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
+    graves = c.get("/api/graveyard/all")
+    assert graves.status_code == 200 and graves.json()[0]["bot_id"] == bot["bot_id"]

@@ -5,6 +5,7 @@ The vault (not this file) enforces the real limits; clamping here just avoids si
 
 import hashlib
 import json
+import logging
 import re
 import time
 from threading import Event
@@ -17,6 +18,8 @@ from pydantic import BaseModel, Field
 from parable import vault
 from parable.config import get_settings
 from parable.models import BotRules, TradeDecision
+
+log = logging.getLogger("parable.bot")
 
 LLM_TIMEOUT_S = 30  # Gemma can take ~17s. The bot loop interval must stay longer than this.
 DEAD_REASONS = {"NotAlive", "Expired", "BadgeInvalid", "NotRegistered"}
@@ -248,6 +251,8 @@ def run_bot(bot_id: int, bot_key: str, rules: BotRules, stop_event: Event,
                                   "reason": decision.reason, "tx": tx})
         except Exception as err:  # a failed trade must not crash the loop
             reason = vault.decode_revert(err)
+            if reason == "UnknownError":
+                log.warning("bot %s trade failed: %r", bot_id, err)  # server log only, so the cause is findable
             report("rejected", {"reason": reason})
             if reason in DEAD_REASONS:
                 report("stopped", {"reason": reason})

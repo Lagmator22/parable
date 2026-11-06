@@ -284,3 +284,8 @@ def events(bot_id: int) -> list[BotEvent]:
 
 def report_by_brain() -> dict[str, dict]:
     return default_store().report_by_brain()
+
+
+def all_graves() -> list[DeathRecord]:
+    """Every grave this vault ever produced, any creator (the 'All graves on Arkiv' view)."""
+    return sorted(default_store()._deaths(), key=lambda d: d.bot_id)

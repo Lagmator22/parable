@@ -58,3 +58,15 @@ def test_read_reconnects_once_on_dropped_connection():
 
     assert vault._read(Call) == 42
     assert len(calls) == 2
+
+
+def test_out_of_gas_money_has_a_readable_name():
+    from parable import vault as V
+
+    assert V.decode_revert(ValueError({"code": -32000, "message": "insufficient funds for gas * price + value"})) == "BotOutOfGas"
+
+
+def test_bot_top_up_has_gas_headroom():
+    from parable import vault as V
+
+    assert V.FUND_GAS_LIMIT > 21000  # 21000 exactly ran out of gas on Sepolia for brand-new bot wallets

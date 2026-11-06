@@ -87,13 +87,17 @@ def expire(bot_id: int) -> str:
     return _tx_hex(_send(_vault().functions.expire(bot_id), _operator_key()))
 
 
+FUND_GAS_LIMIT = 100_000
 BOT_GAS_WEI = 10**15  # 0.001 test ETH: enough gas for a bot's trades on Sepolia (gas there is very cheap)
 
 
 def fund_gas(bot_address: str, wei: int = BOT_GAS_WEI) -> str:
     """Send a little Sepolia ETH so the bot's own key can pay gas for its trades."""
     to = Web3.to_checksum_address(bot_address)
-    build = lambda fields: {**fields, "to": to, "value": wei, "gas": 21000}  # a plain ETH transfer costs 21000 gas
+    # A plain transfer used to cost exactly 21000 gas, but on today's Sepolia sending ETH to a BRAND-NEW wallet
+    # ran out of gas at 21000 (every bot top-up failed, so bots could never pay for a trade). Give it headroom:
+    # unused gas is not charged.
+    build = lambda fields: {**fields, "to": to, "value": wei, "gas": FUND_GAS_LIMIT}
     return _tx_hex(tx_sender.send(_w3(), _operator_key(), build, timeout=RECEIPT_TIMEOUT_S))
 
 
@@ -166,4 +170,6 @@ def decode_revert(err: Exception) -> str:
     for selector, name in table.items():
         if selector in text.lower():
             return name
+    if "insufficient funds" in text.lower():
+        return "BotOutOfGas"  # the bot's wallet has no test ETH left to pay the network fee
     return "UnknownError"  # never echo raw error text: it can contain node URLs or API keys

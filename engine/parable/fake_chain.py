@@ -158,6 +158,9 @@ class FakeArkiv:
                 r.status = "dead"
         return f"fake-death-{d.bot_id}"
 
+    def all_graves(self):
+        return sorted((d for d, _, _ in self.deaths), key=lambda d: d.bot_id)
+
     def graveyard(self, creator_id):
         return [d for d, cid, _ in self.deaths if cid == creator_id]
 
