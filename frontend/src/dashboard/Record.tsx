@@ -47,17 +47,16 @@ export function Register({ graves, report, recordError }: Props) {
     {recordError && <div className="box empty">{recordError}</div>}
     <div className="box rows register">
       {rows.length > PAGE_SIZE && <GraveyardPages page={page} total={rows.length} onPage={setPage}/>}
-      <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Trades</span><span>Lived</span><span>Return</span><span>How it ended</span><span>Check it</span></div>
+      <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Trades</span><span>Lived</span><span>How it ended</span><span>Check it</span></div>
       {rows.length === 0 ? <div className="empty">{recordError ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
         : visibleRows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
           <span>{g.bot_id}</span><span><span className="struck">{g.ens_name}</span>{g.approval === 'demo' && <span className="muted" title="Approved without World ID (demo approval)"> · demo</span>}</span><span>{brainName(g.brain)}</span><span>{g.trades ?? '—'}</span>
-          <span>{lived(g.lifetime_s)}</span><span className={trend(g.pnl_bps)}>{pct(g.pnl_bps)}</span>
+          <span>{lived(g.lifetime_s)}</span>
           <span>{causeName(g.cause)}</span>
           <span className="links"><OutLink href={g.arkiv_url}>Arkiv</OutLink><OutLink href={g.tx_url}>tx</OutLink></span>
         </div>)}
     </div>
-    {report && <div className="legend"><span>Launched {report.launched}</span><span>Running {report.alive}</span><span>Dead {report.dead}</span>
-      <span>Made money {report.profitable}</span><span>Average {pct(report.avg_pnl_bps)}</span></div>}
+    {report && <div className="legend"><span>Launched {report.launched}</span><span>Running {report.alive}</span><span>Dead {report.dead}</span></div>}
   </Section>;
 }
 

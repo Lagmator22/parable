@@ -16,7 +16,7 @@ The vault registers each bot before it can trade, checks its ENSv2 badge and lim
 
 1. **[Launch](https://parable-demo.centralindia.cloudapp.azure.com/#launch).** Choose a strategy, model, starting balance, trade cap, loss limit and lifetime. Approve with World ID, or use the labeled demo option to try the flow without a phone.
 2. **[Running](https://parable-demo.centralindia.cloudapp.azure.com/#live).** Follow a bot's decisions and open the Sepolia transaction links. Use **Telemetry** in the top bar to inspect prices and bot returns.
-3. **[Register](https://parable-demo.centralindia.cloudapp.azure.com/#register).** Browse stopped bots 10 at a time. Each row shows trades, return and why the bot stopped, with links to Arkiv and Sepolia when available.
+3. **[Register](https://parable-demo.centralindia.cloudapp.azure.com/#register).** Browse stopped bots 10 at a time. Each row shows trades, runtime and why the bot stopped, with links to Arkiv and Sepolia when available.
 4. **[Try to cheat](https://parable-demo.centralindia.cloudapp.azure.com/#cheat).** Dry-run an unregistered trade, an over-limit trade or a second-wallet attempt against the vault. The dashboard shows the contract response and a command you can run yourself.
 
 <details>

@@ -17,7 +17,10 @@ test('shows ten graves at a time and keeps the oldest records reachable', async 
     tx_hash: '0xdead', tx_url: null, arkiv_url: `https://example.test/entity/${index + 1}`,
   }));
   const render = (records: Grave[]) => act(async () => root.render(
-    <Register graves={records} report={null} recordError=""/>,
+    <Register graves={records} recordError="" report={{
+      subject: 'all', launched: records.length, alive: 0, dead: records.length,
+      profitable: 0, avg_pnl_bps: 0, worst_pnl_bps: 0, vault_count_matches: true,
+    }}/>,
   ));
   const ids = () => [...host.querySelectorAll('.register .row:not(.head)')]
     .map(row => Number(row.firstElementChild?.textContent));
@@ -26,6 +29,8 @@ test('shows ten graves at a time and keeps the oldest records reachable', async 
 
   try {
     await render(graves);
+    expect(host.querySelector('.register .head')?.textContent).not.toContain('Return');
+    expect(host.textContent).not.toContain('0.0%');
     expect(ids()).toEqual([103, 102, 101, 100, 99, 98, 97, 96, 95, 94]);
     expect(button('Previous').disabled).toBe(true);
     await act(async () => button('Next').click());
