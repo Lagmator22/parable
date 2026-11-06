@@ -141,3 +141,10 @@ A real launch takes **30–90 s** after approval (6 blockchain transactions). Sh
 - **Final:** `npm run build` writes `frontend/dist/`. The engine serves `frontend/dist/index.html` at `/` and
   `frontend/dist/assets/*` at `/assets/*` when that folder exists (the old dashboard stays at `/classic`).
   So: a single-page app with no client-side routes other than `#hash` anchors (or use hash routing).
+
+## Added Fri 20:30 IST: swarm and live graphs (live, replaces the planned /api/manager)
+- `GET /api/swarm` → `{phase: idle|waiting|launching|running|done, plan: {mind, workers[], bots, minutes} | null, born, total, next_check_in, bots: [{bot_id, ens_name, brain, strategy, status, equity_usd, pnl_bps, trades, refused, left_s}], decisions: [{at, action: launch|keep|flag|stop, bot_id, reason, by}]}`
+- `POST /api/swarm/start` `{mind, workers[], bots, minutes}` → `{pending_id, claim, approve_url}` (400 if a brain isn't set up or the mind is "rule"). One World ID approval covers the whole swarm.
+- `POST /api/swarm/{pending_id}/confirm` (header `x-claim`) → 409 waiting, 403 denied, 200 status. `POST /api/swarm/stop` (header `x-claim`) stops the mind.
+- `GET /api/series` → `{every_s, prices: [[t, market_usd|null, chainlink_usd|null]], bots: [{bot_id, ens_name, brain, strategy, swarm, status, points: [[t, vault_bps, market_bps]]}]}`; in memory since server start.
+- Brains are now `rule`, `claude:<model>`, `gemini:<model>`, `gemma:<model>` (no `local`). Claude shows `available: false` while the account has no credit.

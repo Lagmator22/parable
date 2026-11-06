@@ -9,7 +9,7 @@ import App from './App';
 afterEach(() => {
   vi.unstubAllGlobals();
   document.body.innerHTML = '';
-  document.documentElement.dataset.theme = 'dark';
+  document.documentElement.dataset.theme = 'light';
 });
 
 test('switches theme immediately without View Transitions', async () => {
@@ -30,12 +30,12 @@ test('switches theme immediately without View Transitions', async () => {
   await act(async () => root.render(<App />));
 
   const button = document.querySelector<HTMLButtonElement>(
-    'button[aria-label="Switch to light mode"]',
+    'button[aria-label="Switch to dark mode"]',
   );
   expect(button).not.toBeNull();
   await act(async () => button!.click());
-  expect(document.documentElement.dataset.theme).toBe('light');
-  expect(saved.get('parable-theme')).toBe('light');
+  expect(document.documentElement.dataset.theme).toBe('dark');
+  expect(saved.get('parable-theme')).toBe('dark');
 
   await act(async () => root.unmount());
 });
@@ -55,7 +55,8 @@ test('renders sections in demo order, plain words, no emoji, and only launched b
           { brain: 'rule', available: true, launched: 3, alive: 0, dead: 3, profitable: 1, avg_pnl_bps: -200, worst_pnl_bps: -1000 },
           { brain: 'claude', available: false, launched: 0, alive: 0, dead: 0, profitable: 0, avg_pnl_bps: 0, worst_pnl_bps: 0 },
         ]
-      : url === '/api/manager' ? { enabled: true, mind: 'gemini:gemini-3.5-flash-lite', bots: [5], decisions: [] }
+      : url === '/api/swarm' ? { phase: 'idle', plan: null, born: 0, total: 0, next_check_in: null, bots: [], decisions: [] }
+      : url === '/api/series' ? { every_s: 10, prices: [], bots: [] }
       : url.startsWith('/api/graveyard/') ? [{ bot_id: 2, cause: 'loss_limit', final_equity_usd: 89_000_000, start_cash_usd: 100_000_000, pnl_bps: -1100, lifetime_s: 600, tx_hash: '0xdead', ens_name: 'bot-2.parable.eth', brain: 'rule', tx_url: 'https://sepolia.etherscan.io/tx/0xdead' }]
       : url.startsWith('/api/report?') ? { subject: '0xcreator', launched: 3, alive: 1, dead: 2, profitable: 1, worst_pnl_bps: -1100, avg_pnl_bps: -200, vault_count_matches: true }
       : [];
@@ -67,14 +68,14 @@ test('renders sections in demo order, plain words, no emoji, and only launched b
   await act(async () => root.render(<App />));
 
   const ids = Array.from(host.querySelectorAll('main > section')).map(el => el.id);
-  expect(ids).toEqual(['hero', 'launch', 'live', 'graveyard', 'cheat', 'more', 'how']);
+  expect(ids).toEqual(['hero', 'launch', 'live', 'register', 'cheat', 'swarm', 'bench', 'how']);
   const text = host.textContent || '';
-  expect(text).toContain('Practice arena');
-  expect(host.querySelector('.arena-pick')).toBeNull();  // the arena stays folded until opened
+  expect(text).toContain('Launch a');  // the sentence form
   expect(text).toContain('Lost too much, the vault ended it');
-  expect(text).toContain('Simple rule (no AI)');
-  expect(text).not.toContain('claude');  // brains with no launches are hidden
+  expect(text).toContain('Practice arena');
+  expect(text).not.toContain('Claude');  // brains with no launches are hidden from the comparison
   expect(text).not.toMatch(/LIVE ·|SIMULATION|proof/i);  // no shouting tags
   expect(text).not.toMatch(/\p{Extended_Pictographic}/u);  // our own icons, never emoji
+  expect(host.querySelector('.register .struck')?.textContent).toBe('bot-2.parable.eth');  // dead names struck through
   await act(async () => root.unmount());
 });

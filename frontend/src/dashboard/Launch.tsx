@@ -1,128 +1,121 @@
-// Section 01: pick limits, approve with World ID, then watch the six launch steps finish one by one.
-// The step list follows what the server reports ("step N/6 done"), never a timer.
+// Section 01: the launch form is one sentence. Click an underlined word, pick from the tray under the
+// sentence, approve with World ID, then watch the six launch steps finish (the server reports each step).
 import { useEffect, useRef, useState } from 'react';
-import { Button, OutLink } from '../components/ui/Button';
-import { Check, Coin, Ledger, Person, Tag, Vault, Wallet } from '../components/ui/Glyphs';
 import { Section } from '../components/ui/Section';
-import { SelectMenu } from '../components/ui/SelectMenu';
 import { ApiError, brainName, post, saveCreator, saveOwner, type Bot, type Brain, type Info, type Rules } from './api';
 
 type Props = { info: Info | null; brains: Brain[]; onBorn: (creator: string) => void };
 type Pending = { pending_id: string; claim: string; approve_url: string };
 type Confirmed = { bot: Bot; owner_token: string; tx_url: string | null };
-type Phase = 'ready' | 'waiting' | 'creating' | 'born';
+type Field = 'strategy' | 'brain' | 'cash' | 'trade' | 'loss' | 'life';
+type Option = { value: string | number; label: string; note: string; off?: boolean };
 const pause = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
 
+const STRATEGY_NOTES: Record<string, string> = { momentum: 'buys when the price is rising', dip_buyer: 'buys after the price drops', yolo: 'trades the most it may, every turn' };
+const NUMBERS: Record<'cash' | 'trade' | 'loss' | 'life', { values: number[]; note: (n: number) => string; show: (n: number) => string; unit: string }> = {
+  cash: { values: [50, 100, 250, 500], note: () => 'starting cash', show: n => `$${n}`, unit: 'dollars' },
+  trade: { values: [5, 10, 20, 50], note: () => 'biggest single trade', show: n => `$${n}`, unit: 'dollars' },
+  loss: { values: [2, 5, 10, 25], note: n => n <= 2 ? 'very strict' : n >= 25 ? 'very loose' : 'stop point', show: n => `${n}%`, unit: '%' },
+  life: { values: [5, 10, 30, 60], note: n => n >= 60 ? 'long enough to see the price move' : 'lifetime', show: n => `${n} minutes`, unit: 'minutes' },
+};
+const TITLES: Record<Field, [string, string]> = {
+  strategy: ['Pick a strategy', 'How it decides to buy or sell'], brain: ['Pick a brain', 'Dashed = not set up on this server'],
+  cash: ['Starting cash', 'Practice money on Sepolia'], trade: ['Biggest single trade', 'The vault refuses anything bigger'],
+  loss: ['Stop it if it loses', 'The vault ends the bot past this point'], life: ['How long it lives', 'Then it stops for good'],
+};
+const STEPS = ['You approved it', 'Its own wallet', 'Test ETH for fees', 'Its ENS name', 'Vault registers it', 'Written to Arkiv'];
+
 export function Launch({ info, brains, onBorn }: Props) {
-  const [strategy, setStrategy] = useState('yolo');
-  const [brain, setBrain] = useState('rule');
-  const [cash, setCash] = useState('100');
-  const [trade, setTrade] = useState('20');
-  const [loss, setLoss] = useState('10');
-  const [minutes, setMinutes] = useState('10');
-  const [phase, setPhase] = useState<Phase>('ready');
+  const [v, setV] = useState({ strategy: 'yolo', brain: 'rule', cash: 100, trade: 20, loss: 10, life: 10 });
+  const [open, setOpen] = useState<Field | null>(null);
+  const [phase, setPhase] = useState<'ready' | 'waiting' | 'creating' | 'born'>('ready');
   const [done, setDone] = useState(0);
-  const [bornBot, setBornBot] = useState<Bot | null>(null);
   const [message, setMessage] = useState('');
-  const [tx, setTx] = useState<string | null>(null);
   const [approvalUrl, setApprovalUrl] = useState('');
+  const [tx, setTx] = useState<string | null>(null);
   const active = useRef(true);
   useEffect(() => () => { active.current = false; }, []);
-  const available = brains.filter(item => item.available);
-  useEffect(() => {  // start on the first AI brain if there is one; the plain rule stays one click away
-    // 3.5 Flash-Lite answered every test question fastest in our benchmark, so it is the default AI
-    const ai = available.find(item => item.brain === 'gemini:gemini-3.5-flash-lite') || available.find(item => item.brain.startsWith('gemini:'));
-    if (ai && brain === 'rule') setBrain(ai.brain);
-  }, [brains.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {  // default to the AI that answered fastest in our benchmark, if it is set up
+    const ok = brains.filter(b => b.available).map(b => b.brain);
+    const pick = ['gemini:gemini-3.5-flash-lite', ...ok.filter(b => b !== 'rule')].find(b => ok.includes(b));
+    if (pick) setV(prev => prev.brain === 'rule' ? { ...prev, brain: pick } : prev);
+  }, [brains]);
 
-  async function launch(event: React.FormEvent) {
-    event.preventDefault();
-    if (phase === 'waiting' || phase === 'creating') return;
-    const values = [cash, trade, loss, minutes].map(Number);
-    if (values.some(value => !Number.isFinite(value) || value <= 0) || values[1] > values[0] || values[2] > 100) {
-      setMessage('Use positive numbers. Max trade can’t be more than the starting cash, and max loss can’t pass 100%.'); return;
-    }
-    if (!available.some(item => item.brain === brain)) { setMessage('Pick a brain from the list.'); return; }
-    // Money goes to the server in whole units: dollars have 6 decimals, percentages are basis points (1% = 100).
-    const rules: Rules = { strategy, brain, start_cash_usd: Math.round(values[0] * 1e6), max_trade_usd: Math.round(values[1] * 1e6), max_loss_bps: Math.round(values[2] * 100), lease_seconds: Math.round(values[3] * 60) };
-    setPhase('waiting'); setBornBot(null); setDone(0); setTx(null); setApprovalUrl('');
-    setMessage('A World ID tab is opening. Approve the bot there.');
-    const approvalTab = window.open('', '_blank');
+  const options = (f: Field): Option[] => {
+    if (f === 'strategy') return (info?.strategies || ['momentum', 'dip_buyer', 'yolo']).map(s => ({ value: s, label: s.replace('_', ' '), note: STRATEGY_NOTES[s] || '' }));
+    if (f === 'brain') return brains.map(b => ({ value: b.brain, label: brainName(b.brain), off: !b.available,
+      note: !b.available ? (b.brain.startsWith('claude') ? 'not set up: needs API credit' : 'not set up') : b.brain === 'rule' ? 'no AI, never fails' : b.brain.split(':')[0] }));
+    const n = NUMBERS[f];
+    return n.values.map(x => ({ value: x, label: n.show(x), note: n.note(x) }));
+  };
+  const label = (f: Field) => f === 'strategy' ? String(v.strategy).replace('_', ' ') : f === 'brain' ? brainName(v.brain) : NUMBERS[f].show(v[f]);
+  const word = (f: Field) => <button type="button" className="word" aria-expanded={open === f} onClick={() => setOpen(open === f ? null : f)}>{label(f)}</button>;
+  const tooBig = v.trade > v.cash;
+  const busy = phase === 'waiting' || phase === 'creating';
+
+  async function launch() {
+    if (busy || tooBig) return;
+    const rules: Rules = { strategy: v.strategy, brain: v.brain, start_cash_usd: Math.round(v.cash * 1e6), max_trade_usd: Math.round(v.trade * 1e6),
+      max_loss_bps: Math.round(v.loss * 100), lease_seconds: Math.round(v.life * 60) };  // dollars have 6 decimals; 1% = 100 bps
+    setOpen(null); setPhase('waiting'); setDone(0); setTx(null); setApprovalUrl(''); setMessage('A World ID tab is opening. Approve the bot there.');
+    const tab = window.open('', '_blank');
     try {
       const pending = await post<Pending>('/api/launch', rules);
-      if (approvalTab) approvalTab.location.href = pending.approve_url;
-      else { setApprovalUrl(pending.approve_url); setMessage('Your browser blocked the new tab. Open World ID with the link below.'); }
+      if (tab) tab.location.href = pending.approve_url;
+      else { setApprovalUrl(pending.approve_url); setMessage('Your browser blocked the new tab. Use the link below.'); }
       const deadline = Date.now() + 10 * 60_000;
       while (active.current && Date.now() < deadline) {
         try {
-          const result = await post<Confirmed>(`/api/launch/${encodeURIComponent(pending.pending_id)}/confirm`, undefined, { 'x-claim': pending.claim });
+          const r = await post<Confirmed>(`/api/launch/${encodeURIComponent(pending.pending_id)}/confirm`, undefined, { 'x-claim': pending.claim });
           if (!active.current) return;
-          saveCreator(result.bot.creator_id);
-          saveOwner(result.bot.bot_id, result.owner_token);
-          setBornBot(result.bot); setDone(6); setPhase('born'); setApprovalUrl('');
-          setMessage(`${result.bot.ens_name} is running. Watch it below.`);
-          setTx(result.tx_url); onBorn(result.bot.creator_id); return;
+          saveCreator(r.bot.creator_id); saveOwner(r.bot.bot_id, r.owner_token);
+          setDone(6); setPhase('born'); setTx(r.tx_url); setApprovalUrl('');
+          setMessage(`${r.bot.ens_name} is running. It shows up below.`); onBorn(r.bot.creator_id); return;
         } catch (err) {
           if (!(err instanceof ApiError && err.status === 409)) throw err;
           if (err.message.startsWith('approved:')) {
-            approvalTab?.close();
-            setPhase('creating');
+            tab?.close(); setPhase('creating');
             setDone(Number(/step (\d)\/6/.exec(err.message)?.[1] ?? 1));
-            setMessage('Approved. Setting the bot up on Sepolia, this takes about a minute.');
-          } else setMessage('Waiting for you to approve in the World ID tab.');
+            setMessage('Approved. Setting the bot up on Sepolia');
+          } else setMessage('Waiting for you to approve in the World ID tab');
           await pause(2_000);
         }
       }
       if (active.current) throw new Error('No approval within 10 minutes. Start again.');
     } catch (err) {
-      approvalTab?.close();
+      tab?.close();
       if (active.current) { setPhase('ready'); setApprovalUrl(''); setMessage(err instanceof Error ? err.message : 'The launch didn’t go through. Try again.'); }
     }
   }
 
-  const walletUrl = bornBot && info?.explorer ? `${info.explorer.replace('/tx/', '/address/')}${bornBot.bot_address}` : null;
-  const steps = [
-    { Icon: Person, label: 'You approved it with World ID', link: null },
-    { Icon: Wallet, label: 'The bot got its own wallet', link: walletUrl },
-    { Icon: Coin, label: 'It got a little test ETH for fees', link: walletUrl },
-    { Icon: Tag, label: bornBot ? `It got its name: ${bornBot.ens_name}` : 'It got its ENS name', link: bornBot && info?.ens_app ? `${info.ens_app}${bornBot.ens_name}` : null },
-    { Icon: Vault, label: 'The vault registered it with your limits', link: tx },
-    { Icon: Ledger, label: 'Its birth was written to Arkiv', link: null },
-  ];
-  const busy = phase === 'waiting' || phase === 'creating';
-
-  return <Section id="launch" n="01" title="Launch a bot" intro="Choose how it trades and how much it may lose. You approve it, the vault holds the money.">
-    <div className="panel launch" data-reveal>
-      <form onSubmit={launch}>
-        <div className="form-grid">
-          <SelectMenu label="Strategy" value={strategy} onChange={setStrategy} options={(info?.strategies || ['yolo']).map(value => ({ value, label: value.replaceAll('_', ' ') }))}/>
-          <SelectMenu label="Brain" value={brain} onChange={setBrain} options={available.map(item => ({ value: item.brain, label: brainName(item.brain) }))}/>
-          <label>Starting cash ($)<input type="number" min="1" step="0.01" value={cash} onChange={e => setCash(e.target.value)}/></label>
-          <label>Biggest trade ($)<input type="number" min="0.01" step="0.01" value={trade} onChange={e => setTrade(e.target.value)}/></label>
-          <label>Max loss (%)<input type="number" min="0.01" max="100" step="0.01" value={loss} onChange={e => setLoss(e.target.value)}/></label>
-          <label>Lifetime (minutes)<input type="number" min="1" step="1" value={minutes} onChange={e => setMinutes(e.target.value)}/></label>
-        </div>
-        <div className="form-foot">
-          <Button type="submit" variant="solid" disabled={busy || available.length === 0}>
-            {phase === 'creating' ? 'Setting it up…' : phase === 'waiting' ? 'Waiting for approval…' : 'Approve and launch'}
-          </Button>
-          <p>Practice money on the Sepolia test network. When the lifetime ends, the bot stops for good.</p>
-        </div>
-      </form>
-      {message && <div className={`note ${phase === 'born' ? 'good' : ''}`} role="status">
-        <span>{message}</span>
-        {approvalUrl && <OutLink href={approvalUrl}>Open World ID</OutLink>}
-      </div>}
-      {(phase === 'creating' || phase === 'born') && <ol className="steps" aria-label="Launch progress">
-        {steps.map(({ Icon, label, link }, i) => {
-          const state = i < done ? 'done' : i === done ? 'now' : 'later';
-          return <li key={i} className={state}>
-            <span className="step-icon">{state === 'done' ? <Check size={16}/> : <Icon size={16}/>}</span>
-            <span>{label}</span>
-            {state === 'done' && <OutLink href={link}>view</OutLink>}
-          </li>;
-        })}
-      </ol>}
+  return <Section id="launch" label="01 Launch">
+    <p className="sentence">
+      Launch a {word('strategy')} bot that thinks with <span className="nowrap">{word('brain')},</span> starts with <span className="nowrap">{word('cash')},</span> trades
+      at most {word('trade')} at a time, is stopped if it loses <span className="nowrap">{word('loss')},</span> and lives <span className="nowrap">{word('life')}.</span>
+    </p>
+    {open && <div className="box">
+      <div className="box-head"><strong style={{ fontFamily: 'var(--head)', fontSize: 18 }}>{TITLES[open][0]}</strong><span className="muted">{TITLES[open][1]}</span>
+        <button type="button" className="square-btn" aria-label="Close" onClick={() => setOpen(null)}>×</button></div>
+      <div className="tray-options">{options(open).map(o => <button type="button" key={String(o.value)} className="opt" disabled={o.off}
+        aria-pressed={v[open] === o.value} onClick={() => { setV(prev => ({ ...prev, [open]: o.value })); setOpen(null); }}>
+        <strong style={{ textTransform: open === 'strategy' ? 'capitalize' : undefined }}>{o.label}</strong><span>{o.note}</span></button>)}</div>
+      {open !== 'strategy' && open !== 'brain' && <label className="custom">Or type your own
+        <input type="number" min="1" value={v[open]} onChange={e => { const n = Number(e.target.value); if (n > 0) setV(prev => ({ ...prev, [open]: n })); }}/>
+        <span className="muted">{NUMBERS[open].unit}</span></label>}
+    </div>}
+    <div className="actions">
+      <button type="button" className="btn btn-solid" disabled={busy || tooBig || brains.length === 0} onClick={() => void launch()}>
+        {phase === 'creating' ? 'Setting it up…' : phase === 'waiting' ? 'Waiting for approval…' : 'Approve with World ID'}</button>
+      <p className={`say ${tooBig ? 'bad' : ''}`}>{tooBig ? 'The biggest trade can’t be more than the starting cash.'
+        : `The vault holds the $${v.cash} and enforces the $${v.trade} and ${v.loss}% limits, not the bot. Practice money on Sepolia.`}</p>
     </div>
+    {message && <div className="box">
+      <div className="box-head"><span>{phase === 'creating' && <span className="live"/>} {message}</span>
+        <span>{phase === 'creating' || phase === 'born' ? `step ${Math.min(done + (phase === 'born' ? 0 : 1), 6)} of 6` : ''}</span></div>
+      {(phase === 'creating' || phase === 'born') && <ol className="steps">{STEPS.map((s, i) =>
+        <li key={s} className={i < done ? 'done' : i === done ? 'now' : ''}><span>{i < done ? `${i + 1} done` : i === done ? <><span className="live"/> working</> : i + 1}</span>{s}</li>)}</ol>}
+      {(approvalUrl || tx) && <div className="chart-note">{approvalUrl && <a href={approvalUrl} target="_blank" rel="noreferrer">Open World ID</a>}
+        {tx && <a href={tx} target="_blank" rel="noreferrer">See the vault transaction</a>}</div>}
+    </div>}
   </Section>;
 }

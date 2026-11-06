@@ -7,8 +7,11 @@ export type Grave = { bot_id: number; cause: string; final_equity_usd: number; s
 export type Report = { subject: string; launched: number; alive: number; dead: number; profitable: number; worst_pnl_bps: number; avg_pnl_bps: number; vault_count_matches: boolean };
 export type BrainReport = Brain & Omit<Report, 'subject' | 'vault_count_matches'>;
 export type Attack = { attack: string; blocked: boolean; reason: string };
-export type ManagerDecision = { at: number; action: 'launch' | 'keep' | 'flag' | 'kill'; bot_id: number | null; reason: string };
-export type Manager = { enabled: boolean; mind: string; bots: number[]; decisions: ManagerDecision[] };
+export type SwarmBot = { bot_id: number; ens_name: string; brain: string; strategy: string; status: string; equity_usd: number; pnl_bps: number; trades: number; refused: number; left_s: number };
+export type SwarmDecision = { at: number; action: 'launch' | 'keep' | 'flag' | 'stop'; bot_id: number | null; reason: string; by: string };
+export type Swarm = { phase: 'idle' | 'waiting' | 'launching' | 'running' | 'done'; plan: { mind: string; workers: string[]; bots: number; minutes: number } | null; born: number; total: number; next_check_in: number | null; bots: SwarmBot[]; decisions: SwarmDecision[] };
+export type SeriesBot = { bot_id: number; ens_name: string; brain: string; strategy: string; swarm: boolean; status: string; points: [number, number, number][] };
+export type Series = { every_s: number; prices: [number, number | null, number | null][]; bots: SeriesBot[] };
 
 export class ApiError extends Error { constructor(message: string, public status: number) { super(message); } }
 
@@ -48,7 +51,16 @@ export const pct = (value: number | null | undefined) => {
 };
 /** 'up' or 'down' for coloring a return; tiny moves that show as 0.0% get no color. */
 export const trend = (bps: number | null | undefined) => Math.round((bps || 0) / 10) > 0 ? 'up' : Math.round((bps || 0) / 10) < 0 ? 'down' : '';
-export const brainName = (value: string) => value === 'rule' ? 'Simple rule (no AI)' : value === 'unknown' ? 'Unknown brain' : value.includes(':') ? value.split(':')[1] : value;
+// "gemini:gemini-3.5-flash-lite" -> "Gemini 3.5 Flash-Lite", "claude:claude-opus-5-5" -> "Claude Opus 5.5".
+export const brainName = (value: string) => {
+  if (value === 'rule') return 'Simple rule (no AI)';
+  if (value === 'unknown') return 'not recorded';
+  const model = value.includes(':') ? value.split(':')[1] : value;
+  const words = model.replace(/-it$/, '').split('-').map(w => /^\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1));
+  const out: string[] = [];
+  words.forEach(w => { const prev = out[out.length - 1]; if (prev && /^\d+$/.test(prev) && /^\d+$/.test(w)) out[out.length - 1] = `${prev}.${w}`; else out.push(w); });
+  return out.join(' ').replace(/Flash Lite/, 'Flash-Lite').replace(/ (\d+)b\b/i, ' $1B').replace(/ A\d+b\b/i, '');
+};
 export const causeName = (value: string) => ({ expired: 'Its time ran out', killed: 'Stopped by its creator', loss_limit: 'Lost too much, the vault ended it' })[value as 'expired' | 'killed' | 'loss_limit'] || value;
 // What each vault refusal means, in one plain sentence.
 const vaultErrors: Record<string, string> = {

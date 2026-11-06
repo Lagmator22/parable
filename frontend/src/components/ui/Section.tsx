@@ -1,12 +1,11 @@
-// One numbered page section: a small number, a short title, one line of explanation, then its content.
+// One page section: a small label on the left ("01 Launch"), the content on the right, a rule underneath.
 import type { ReactNode } from 'react';
 
-export function Section({ id, n, title, intro, children }: { id: string; n: string; title: string; intro: string; children: ReactNode }) {
-  return <section className="section" id={id}>
-    <header className="section-head" data-reveal>
-      <span className="section-n">{n}</span>
-      <div><h2>{title}</h2><p>{intro}</p></div>
-    </header>
-    {children}
+export function Section({ id, label, className = '', children }: { id: string; label: string; className?: string; children: ReactNode }) {
+  return <section className={`section ${className}`} id={id}>
+    <div className="wrap">
+      <div className="section-label">{label}</div>
+      <div className="section-body">{children}</div>
+    </div>
   </section>;
 }

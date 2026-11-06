@@ -1,16 +1,16 @@
-// Parable's own small icon set: one stroke style, drawn on a 24px grid, colored by the text around it.
+// Parable's own small icon set: 2px square-ended strokes on a 24px grid, colored by the text around it.
 // Used instead of emoji so every symbol looks like it belongs to the same site.
 import type { SVGProps } from 'react';
 
 type GlyphProps = SVGProps<SVGSVGElement> & { size?: number };
 
 function Glyph({ size = 22, children, ...props }: GlyphProps) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6}
-    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false" {...props}>{children}</svg>;
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+    strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true" focusable="false" {...props}>{children}</svg>;
 }
 
 /** A gravestone: a bot that has died. */
-export const Tomb = (p: GlyphProps) => <Glyph {...p}><path d="M6 20.5V10a6 6 0 0 1 12 0v10.5"/><path d="M3.5 20.5h17"/><path d="M9.5 11.5h5M9.5 14.5h5"/></Glyph>;
+export const Tomb = (p: GlyphProps) => <Glyph {...p}><path d="M6 21V10a6 6 0 0 1 12 0v11"/><path d="M3 21h18"/><path d="M10 12h4"/></Glyph>;
 
 /** A sprout: a bot being born. */
 export const Sprout = (p: GlyphProps) => <Glyph {...p}><path d="M12 21v-8"/><path d="M12 13c0-4.2 2.8-6.5 7.5-6.5 0 4.2-2.8 6.5-7.5 6.5Z"/><path d="M12 15.5c0-3.3-2.2-5.2-6-5.2 0 3.3 2.2 5.2 6 5.2Z"/></Glyph>;
@@ -19,7 +19,7 @@ export const Sprout = (p: GlyphProps) => <Glyph {...p}><path d="M12 21v-8"/><pat
 export const Trade = (p: GlyphProps) => <Glyph {...p}><path d="M5 8h13l-3.5-3.5"/><path d="M19 16H6l3.5 3.5"/></Glyph>;
 
 /** A shield with a cross: the vault refused something. */
-export const Shield = (p: GlyphProps) => <Glyph {...p}><path d="M12 3 19 6v5.2c0 4.6-2.9 7.8-7 9.8-4.1-2-7-5.2-7-9.8V6Z"/><path d="m9.5 9.5 5 5m0-5-5 5"/></Glyph>;
+export const Shield = (p: GlyphProps) => <Glyph {...p}><rect x="4" y="4" width="16" height="16"/><path d="m8 8 8 8m0-8-8 8"/></Glyph>;
 
 /** A person: one human behind each creator (World ID). */
 export const Person = (p: GlyphProps) => <Glyph {...p}><circle cx="12" cy="8" r="3.5"/><path d="M5 20.5c1-4 3.8-6 7-6s6 2 7 6"/></Glyph>;

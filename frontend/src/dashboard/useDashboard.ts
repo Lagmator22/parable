@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getCreator, request, saveCreator, type Bot, type Brain, type BrainReport, type Event, type Grave, type Info, type Manager, type Report } from './api';
+import { getCreator, request, saveCreator, type Bot, type Brain, type BrainReport, type Event, type Grave, type Info, type Report, type Series, type Swarm } from './api';
 
 export function useDashboard() {
   const [creator, setCreator] = useState(getCreator);
@@ -8,14 +8,14 @@ export function useDashboard() {
   const [bots, setBots] = useState<Bot[]>([]);
   const [latestEvents, setLatestEvents] = useState<Record<number, Event>>({});
   const [botEvents, setBotEvents] = useState<Record<number, Event[]>>({});
-  const [manager, setManager] = useState<Manager | null>(null);
-  const [managerError, setManagerError] = useState('');
+  const [swarm, setSwarm] = useState<Swarm | null>(null);
+  const [series, setSeries] = useState<Series | null>(null);
   const [graves, setGraves] = useState<Grave[]>([]);
   const [report, setReport] = useState<Report | null>(null);
   const [comparison, setComparison] = useState<BrainReport[]>([]);
   const [error, setError] = useState('');
   const [recordError, setRecordError] = useState('');
-  const busy = useRef({ live: false, record: false, manager: false });
+  const busy = useRef({ live: false, record: false, swarm: false });
 
   useEffect(() => {
     const savedCreator = getCreator();
@@ -55,12 +55,15 @@ export function useDashboard() {
     finally { busy.current.live = false; }
   }, [creator]);
 
-  const refreshManager = useCallback(async () => {
-    if (document.hidden || busy.current.manager) return;
-    busy.current.manager = true;
-    try { setManager(await request<Manager>('/api/manager')); setManagerError(''); }
-    catch (err) { setManagerError(err instanceof Error ? err.message : 'Could not load the swarm.'); }
-    finally { busy.current.manager = false; }
+  // The swarm and the graphs: small, cheap reads (no Arkiv queries for the graphs).
+  const refreshSwarm = useCallback(async () => {
+    if (document.hidden || busy.current.swarm) return;
+    busy.current.swarm = true;
+    try {
+      const [sw, se] = await Promise.allSettled([request<Swarm>('/api/swarm'), request<Series>('/api/series')]);
+      if (sw.status === 'fulfilled') setSwarm(sw.value);
+      if (se.status === 'fulfilled') setSeries(se.value);
+    } finally { busy.current.swarm = false; }
   }, []);
 
   const refreshRecord = useCallback(async () => {
@@ -80,14 +83,14 @@ export function useDashboard() {
   }, [creator]);
 
   useEffect(() => {
-    void refreshLive(); void refreshRecord(); void refreshManager();
+    void refreshLive(); void refreshRecord(); void refreshSwarm();
     const liveTimer = window.setInterval(refreshLive, 5_000);
-    const managerTimer = window.setInterval(refreshManager, 5_000);
+    const swarmTimer = window.setInterval(refreshSwarm, 5_000);
     const recordTimer = window.setInterval(refreshRecord, 15_000);
-    const onVisible = () => { if (!document.hidden) { void refreshLive(); void refreshRecord(); void refreshManager(); } };
+    const onVisible = () => { if (!document.hidden) { void refreshLive(); void refreshRecord(); void refreshSwarm(); } };
     document.addEventListener('visibilitychange', onVisible);
-    return () => { window.clearInterval(liveTimer); window.clearInterval(managerTimer); window.clearInterval(recordTimer); document.removeEventListener('visibilitychange', onVisible); };
-  }, [refreshLive, refreshRecord, refreshManager]);
+    return () => { window.clearInterval(liveTimer); window.clearInterval(swarmTimer); window.clearInterval(recordTimer); document.removeEventListener('visibilitychange', onVisible); };
+  }, [refreshLive, refreshRecord, refreshSwarm]);
 
-  return { creator, setCreator, info, brains, bots, latestEvents, botEvents, manager, managerError, setManager, graves, report, comparison, error, recordError, refreshLive, refreshRecord, refreshManager };
+  return { creator, setCreator, info, brains, bots, latestEvents, botEvents, swarm, setSwarm, series, graves, report, comparison, error, recordError, refreshLive, refreshRecord, refreshSwarm };
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, test, vi } from 'vitest';
-import { ApiError, explain, pct, request, trend, usd } from './api';
+import { ApiError, brainName, explain, pct, request, trend, usd } from './api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -21,4 +21,12 @@ test('vault refusals read as plain sentences', () => {
 test('shows a safe error when a server returns HTML', async () => {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503, json: () => Promise.reject(new Error('HTML response')) }));
   await expect(request('/api/report/brains')).rejects.toEqual(new ApiError('Server error (503)', 503));
+});
+
+test('model ids read as product names', () => {
+  expect(brainName('gemini:gemini-3.5-flash-lite')).toBe('Gemini 3.5 Flash-Lite');
+  expect(brainName('claude:claude-opus-5-5')).toBe('Claude Opus 5.5');
+  expect(brainName('gemma:gemma-4-26b-a4b-it')).toBe('Gemma 4 26B');
+  expect(brainName('gemma:gemma-4-31b-it')).toBe('Gemma 4 31B');
+  expect(brainName('rule')).toBe('Simple rule (no AI)');
 });
