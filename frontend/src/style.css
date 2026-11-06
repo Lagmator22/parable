@@ -87,6 +87,7 @@ svg text::selection { fill: #fff; }
 .rows { font: 14px var(--mono); }
 .row { display: grid; gap: 16px; padding: 13px 16px; border-bottom: 1px solid var(--rule); align-items: baseline; }
 .row:last-child { border-bottom: 0; }
+.row > * { min-width: 0; overflow-wrap: anywhere; }  /* long names break inside their own column, never over the next */
 .row:hover { background: var(--hover); }
 .row.head { color: var(--grey); font-size: 12px; border-bottom: 1px solid var(--ink); }
 .row.head:hover { background: none; }
