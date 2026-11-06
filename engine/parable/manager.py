@@ -30,9 +30,9 @@ class Decision:
 
 
 def pick_mind() -> str:
-    """Choose the best configured brain for the swarm manager (prefers Gemini Flash-Lite or Claude, else rule)."""
+    """Choose the best configured brain for the swarm manager (prefers Gemini Flash-Lite, then Claude, else rule)."""
     avail = available_brains()
-    for preferred in ("claude", "gemini:gemini-3.5-flash-lite", "gemini:gemini-2.5-flash"):
+    for preferred in ("gemini:gemini-3.5-flash-lite", "gemini:gemini-2.5-flash", "claude"):
         if avail.get(preferred):
             return preferred
     for name, ok in avail.items():
@@ -110,14 +110,20 @@ class SwarmManager:
     def audit(self, mind: str | None = None) -> list[dict]:
         """Inspect every live and recent bot's on-chain equity and Arkiv events; flag or kill bad actors."""
         mind = mind or pick_mind()
-        known = {b.bot_id: b for b in self.launcher.b.arkiv.bots()}
+        try:
+            known = {b.bot_id: b for b in self.launcher.b.arkiv.bots()}
+        except Exception:
+            known = {}
         for bot_id, live in list(self.launcher.live.items()):
             known.setdefault(bot_id, live.record)
 
         for bot_id, rec in sorted(known.items()):
             if bot_id not in self.tracked_ids:
                 self.tracked_ids.append(bot_id)
-            events = self.launcher.b.arkiv.events(bot_id)
+            try:
+                events = self.launcher.b.arkiv.events(bot_id)
+            except Exception:
+                events = []
             rejected = [e for e in events if e.kind == "rejected"]
             trades = [e for e in events if e.kind == "trade"]
             try:
