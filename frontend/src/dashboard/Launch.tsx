@@ -2,7 +2,8 @@
 // sentence, approve with World ID, then watch the six launch steps finish (the server reports each step).
 import { useEffect, useRef, useState } from 'react';
 import { Section } from '../components/ui/Section';
-import { ApiError, brainName, post, saveCreator, saveOwner, type Bot, type Brain, type Info, type Rules } from './api';
+import { ApprovalSwitch } from '../components/ui/ApprovalSwitch';
+import { ApiError, brainName, getApprovalMode, post, saveApprovalMode, saveCreator, saveOwner, type ApprovalMode, type Bot, type Brain, type Info, type Rules } from './api';
 
 type Props = { info: Info | null; brains: Brain[]; onBorn: (creator: string) => void };
 type Pending = { pending_id: string; claim: string; approve_url: string };
@@ -28,6 +29,7 @@ const STEPS = ['You approved it', 'Its own wallet', 'Test ETH for fees', 'Its EN
 export function Launch({ info, brains, onBorn }: Props) {
   const [v, setV] = useState({ strategy: 'yolo', brain: 'rule', cash: 100, trade: 20, loss: 10, life: 10 });
   const [open, setOpen] = useState<Field | null>(null);
+  const [approval, setApproval] = useState<ApprovalMode>(getApprovalMode);
   const [phase, setPhase] = useState<'ready' | 'waiting' | 'creating' | 'born'>('ready');
   const [done, setDone] = useState(0);
   const [message, setMessage] = useState('');
@@ -58,7 +60,7 @@ export function Launch({ info, brains, onBorn }: Props) {
   async function launch() {
     if (busy || tooBig) return;
     const rules: Rules = { strategy: v.strategy, brain: v.brain, start_cash_usd: Math.round(v.cash * 1e6), max_trade_usd: Math.round(v.trade * 1e6),
-      max_loss_bps: Math.round(v.loss * 100), lease_seconds: Math.round(v.life * 60) };  // dollars have 6 decimals; 1% = 100 bps
+      max_loss_bps: Math.round(v.loss * 100), lease_seconds: Math.round(v.life * 60), approval: info?.demo_approval ? approval : 'world' };  // dollars have 6 decimals; 1% = 100 bps
     cancelled.current = false;
     setOpen(null); setPhase('waiting'); setDone(0); setTx(null); setApprovalUrl(''); setMessage('A World ID tab is opening. Approve the bot there.');
     const tab = window.open('', '_blank');
@@ -108,9 +110,10 @@ export function Launch({ info, brains, onBorn }: Props) {
         <input type="number" min="1" value={v[open]} onChange={e => { const n = Number(e.target.value); if (n > 0) setV(prev => ({ ...prev, [open]: n })); }}/>
         <span className="muted">{NUMBERS[open].unit}</span></label>}
     </div>}
+    {info?.demo_approval && <ApprovalSwitch mode={approval} onChange={m => { setApproval(m); saveApprovalMode(m); }}/>}
     <div className="actions">
       <button type="button" className="btn btn-solid" disabled={busy || tooBig || brains.length === 0} onClick={() => void launch()}>
-        {phase === 'creating' ? 'Setting it up…' : phase === 'waiting' ? 'Waiting for approval…' : 'Approve with World ID'}</button>
+        {phase === 'creating' ? 'Setting it up…' : phase === 'waiting' ? 'Waiting for approval…' : approval === 'demo' && info?.demo_approval ? 'Approve (demo) and launch' : 'Approve with World ID'}</button>
       <p className={`say ${tooBig ? 'bad' : ''}`}>{tooBig ? 'The biggest trade can’t be more than the starting cash.'
         : `The vault holds the $${v.cash} and enforces the $${v.trade} and ${v.loss}% limits, not the bot. Practice money on Sepolia.`}</p>
     </div>

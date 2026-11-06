@@ -70,13 +70,13 @@ export function useDashboard() {
     if (document.hidden || busy.current.record) return;
     busy.current.record = true;
     try {
+      // The whole public register (not one creator): counts, graves and the vault-count check cover everyone.
       const results = await Promise.allSettled([
-        request<BrainReport[]>('/api/report/brains'),
-        ...(creator ? [request<Grave[]>(`/api/graveyard/${encodeURIComponent(creator)}`), request<Report>(`/api/report?creator=${encodeURIComponent(creator)}`)] : []),
+        request<BrainReport[]>('/api/report/brains'), request<Grave[]>('/api/graveyard/all'), request<Report>('/api/report'),
       ]);
       if (results[0].status === 'fulfilled') setComparison(results[0].value as BrainReport[]);
-      if (creator && results[1]?.status === 'fulfilled') setGraves(results[1].value as Grave[]);
-      if (creator && results[2]?.status === 'fulfilled') setReport(results[2].value as Report);
+      if (results[1].status === 'fulfilled') setGraves(results[1].value as Grave[]);
+      if (results[2].status === 'fulfilled') setReport(results[2].value as Report);
       const rejected = results.find(result => result.status === 'rejected');
       setRecordError(rejected?.status === 'rejected' ? (rejected.reason instanceof Error ? rejected.reason.message : 'Could not load the public record.') : '');
     } finally { busy.current.record = false; }

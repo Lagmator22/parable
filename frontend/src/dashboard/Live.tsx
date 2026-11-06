@@ -15,7 +15,9 @@ export function describe(ev: Event): string {
   if (ev.kind === 'rejected') return `Vault said no: ${explain(String(d.reason ?? d.error ?? 'UnknownError')).toLowerCase()}`;
   const action = String(d.action ?? 'trade');
   const amount = d.amount_usd != null ? ` ${usd(Number(d.amount_usd))} of ETH` : '';
-  return `${action === 'buy' ? 'Bought' : action === 'sell' ? 'Sold' : 'Traded'}${amount}`;
+  // Jev's odds ("buy 87% · sell 3% · hold 10%") or the AI's short reason, so you see WHY it traded.
+  const why = String(d.reason ?? '').replace(/^Jev: \w+ \((.*)\)$/, '$1').replace(/^\[fallback:rule\].*/, 'AI unavailable, simple rule decided').slice(0, 70);
+  return `${action === 'buy' ? 'Bought' : action === 'sell' ? 'Sold' : 'Traded'}${amount}${why ? ` · ${why}` : ''}`;
 }
 
 const clock = (at: number) => new Date(at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });

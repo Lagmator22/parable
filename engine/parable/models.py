@@ -14,7 +14,8 @@ class BotRules(BaseModel):
     max_trade_usd: int
     max_loss_bps: int
     lease_seconds: int
-    brain: str = "rule"  # "rule", "claude", "local", "gemini:<model>" or "gemma:<model>"; old records without a brain count as the free rule
+    brain: str = "rule"  # "rule", "claude:<model>", "jev:<model>", "gemini:<model>" or "gemma:<model>"; old records count as the free rule
+    approval: str = "world"  # "world" = a person approved with World ID; "demo" = approved without it (marked on the register)
 
 
 class TradeDecision(BaseModel):

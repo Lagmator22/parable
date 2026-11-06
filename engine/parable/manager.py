@@ -40,6 +40,7 @@ class SwarmPlan:
     workers: list[str]
     bots: int
     minutes: int
+    approval: str = "world"
 
 
 def mind_prompt(name: str, pnl_bps: int, trades: int, refused: int, left_s: int) -> str:
@@ -66,7 +67,7 @@ class SwarmManager:
         self.stop_event = threading.Event()
 
     # ------------------------------------------------------------ starting a swarm
-    def start(self, mind: str, workers: list[str], bots: int, minutes: int) -> tuple[str, str]:
+    def start(self, mind: str, workers: list[str], bots: int, minutes: int, demo: bool = False) -> tuple[str, str]:
         """Check the plan and ask World ID to approve it. Returns (swarm launch id, claim token)."""
         known = available_brains()
         for brain in [mind, *workers]:
@@ -76,10 +77,11 @@ class SwarmManager:
             raise LaunchError("the mind must be an AI model")
         if self.phase in ("launching", "running"):
             raise LaunchError("a swarm is already running; stop it first")
-        plan = SwarmPlan(mind=mind, workers=workers or ["rule"], bots=max(1, min(bots, 6)), minutes=max(2, min(minutes, 120)))
+        plan = SwarmPlan(mind=mind, workers=workers or ["rule"], bots=max(1, min(bots, 6)), minutes=max(2, min(minutes, 120)),
+                         approval="demo" if demo else "world")
         pid, claim = "s-" + secrets.token_hex(12), secrets.token_urlsafe(24)
         self.pending[pid] = (plan, claim)
-        self.launcher.b.world.register_pending(pid)
+        self.launcher.b.world.register_pending(pid, demo=demo)
         return pid, claim  # the page waits for the approval; the swarm's phase only changes once it starts
 
     def confirm(self, pid: str, claim: str) -> dict:
@@ -124,7 +126,7 @@ class SwarmManager:
                 return
             brain, strategy = plan.workers[i % len(plan.workers)], STRATEGIES[i % len(STRATEGIES)]
             rules = BotRules(strategy=strategy, brain=brain, start_cash_usd=100_000_000, max_trade_usd=20_000_000,
-                             max_loss_bps=1000, lease_seconds=plan.minutes * 60)
+                             max_loss_bps=1000, lease_seconds=plan.minutes * 60, approval=plan.approval)
             try:
                 rec = self.launcher._create_bot(creator_id, rules, claim)  # same steps as a normal launch
             except Exception:

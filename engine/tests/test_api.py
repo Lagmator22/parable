@@ -391,3 +391,11 @@ def test_mcp_full_launch_cheat_and_stop_flow(client):
         assert mcp_server.launch_bot(brain="not-a-brain")["status"] == 422
     finally:
         mcp_server.set_client(None)
+
+
+def test_whole_register_report_checks_the_vault_total(client):
+    c, world, _ = client
+    launch(c, world)
+    launch(c, world)
+    r = c.get("/api/report").json()
+    assert r["launched"] == 2 and r["vault_count_matches"] is True

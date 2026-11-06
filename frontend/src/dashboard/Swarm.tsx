@@ -3,9 +3,10 @@
 // decision with who made it (the mind, or the safety rule).
 import { useEffect, useRef, useState } from 'react';
 import { Section } from '../components/ui/Section';
-import { ApiError, brainName, pct, post, saveOwner, trend, type Brain, type Swarm as SwarmState } from './api';
+import { ApprovalSwitch } from '../components/ui/ApprovalSwitch';
+import { ApiError, brainName, getApprovalMode, pct, post, saveApprovalMode, saveOwner, trend, type ApprovalMode, type Brain, type Swarm as SwarmState } from './api';
 
-type Props = { brains: Brain[]; swarm: SwarmState | null; onUpdate: (s: SwarmState) => void; onBorn: () => void };
+type Props = { brains: Brain[]; swarm: SwarmState | null; onUpdate: (s: SwarmState) => void; onBorn: () => void; demoAllowed?: boolean };
 type Pending = { pending_id: string; claim: string; approve_url: string };
 const CLAIM_KEY = 'parable.swarm-claim';
 const MAX_WORKERS = 6;
@@ -21,7 +22,8 @@ function Stepper({ value, set, min, max, step = 1, label }: { value: number; set
   </div>;
 }
 
-export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
+export function Swarm({ brains, swarm, onUpdate, onBorn, demoAllowed }: Props) {
+  const [approval, setApproval] = useState<ApprovalMode>(getApprovalMode);
   const ready = brains.filter(b => b.available);
   const [mind, setMind] = useState('');
   const [team, setTeam] = useState<Record<string, number>>({});
@@ -52,7 +54,7 @@ export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
     try {
       // The server takes the workers as a list and hands them out in order: ["gemini", "gemini", "rule"].
       const workers = Object.entries(team).flatMap(([b, n]) => Array(n).fill(b));
-      const p = await post<Pending>('/api/swarm/start', { mind, workers, bots: workers.length, minutes });
+      const p = await post<Pending>('/api/swarm/start', { mind, workers, bots: workers.length, minutes, approval: demoAllowed ? approval : 'world' });
       try { localStorage.setItem(CLAIM_KEY, p.claim); } catch { /* private window */ }
       if (tab) tab.location.href = p.approve_url;
       setWaiting({ url: p.approve_url });
@@ -97,7 +99,10 @@ export function Swarm({ brains, swarm, onUpdate, onBorn }: Props) {
           <span><span className="live"/> Waiting for your World ID approval</span>
           <a className="btn btn-quiet" href={waiting.url} target="_blank" rel="noreferrer">Open World ID again</a>
           <button type="button" className="btn" onClick={() => { cancelled.current = true; }}>Cancel</button>
-        </div> : <button type="button" className="btn btn-solid" disabled={!mind || total === 0} onClick={() => void start()}>Approve swarm of {total} with World ID</button>}
+        </div> : <div className="actions">
+          {demoAllowed && <ApprovalSwitch mode={approval} onChange={m => { setApproval(m); saveApprovalMode(m); }}/>}
+          <button type="button" className="btn btn-solid" disabled={!mind || total === 0} onClick={() => void start()}>
+            {approval === 'demo' && demoAllowed ? `Approve swarm of ${total} (demo)` : `Approve swarm of ${total} with World ID`}</button></div>}
         <span className="muted">{msg}</span>
       </div>
     </div>}

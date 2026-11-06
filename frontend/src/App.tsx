@@ -97,7 +97,7 @@ export default function App() {
       <Live bots={d.bots} creator={d.creator} botEvents={d.botEvents} info={d.info} onRefresh={refreshAll}/>
       <Register report={d.report} recordError={d.recordError}/>
       <Cheat bots={d.bots}/>
-      <Swarm brains={d.brains} swarm={d.swarm} onUpdate={d.setSwarm} onBorn={refreshAll}/>
+      <Swarm brains={d.brains} swarm={d.swarm} onUpdate={d.setSwarm} onBorn={refreshAll} demoAllowed={d.info?.demo_approval}/>
       <Bench series={d.series} comparison={d.comparison} recordError={d.recordError}/>
       <Section id="how" label="How it works">
         <ol className="how-list">{HOW.map(([title, text], i) => <li key={title}><span className="mono">{i + 1}</span><h3>{title}</h3><p>{text}</p></li>)}</ol>

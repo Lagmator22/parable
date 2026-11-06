@@ -96,6 +96,7 @@ class LaunchRequest(BaseModel):
     max_loss_bps: int = 1000  # 10% (1 bps = 0.01%)
     lease_seconds: int = 3600
     brain: str = "rule"
+    approval: str = "world"  # "world" (scan with World App) or "demo" (no phone; marked "demo" on the register)
 
 
 def vault_call(fn, *args):
@@ -136,7 +137,7 @@ def info():
     return {"offline": offline(), "explorer": EXPLORER_TX, "vault_address": s.vault_address,
             "ens_parent": s.ens_parent_name, "arkiv_writer": arkiv_writer(),
             "arkiv_explorer": "https://rabdi.explorer.arkiv.network", "ens_app": "https://sepolia.app.ens.domains/",
-            "strategies": list(PRESETS), "default_creator": default_creator, "eth_price_usd": eth_price_usd}
+            "strategies": list(PRESETS), "demo_approval": world_pass.demo_allowed(), "default_creator": default_creator, "eth_price_usd": eth_price_usd}
 
 
 @app.get("/api/brains")
@@ -152,6 +153,8 @@ def launch(req: LaunchRequest):
         raise HTTPException(422, f"unknown brain '{req.brain}'")
     if not known[req.brain]:  # a quiet fallback would spoil the brain comparison, so refuse
         raise HTTPException(400, f"brain '{req.brain}' is not set up on this server")
+    if req.approval not in ("world", "demo") or (req.approval == "demo" and not world_pass.demo_allowed()):
+        raise HTTPException(400, "approval must be 'world', or 'demo' where this server allows it")
     pending_id, claim = get_launcher().start_launch(BotRules(**req.model_dump()))
     # the claim token stays in the requester's browser; only they can confirm this launch
     return {"pending_id": pending_id, "claim": claim,
@@ -216,6 +219,7 @@ def graveyard(creator_id: str):
              "brain": bots[d.bot_id].rules.brain if d.bot_id in bots else "unknown",
              "code_hash": code_fingerprint(bots[d.bot_id].rules) if d.bot_id in bots else "",
              "trades": trades.get(d.bot_id, 0),
+             "approval": bots[d.bot_id].rules.approval if d.bot_id in bots else "world",
              "arkiv_url": explorer + keys[d.bot_id] if d.bot_id in keys and not offline() else None,
              "tx_url": tx_url(d.tx_hash)}
             for d in deaths]

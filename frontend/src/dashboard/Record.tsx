@@ -32,7 +32,7 @@ export function Register({ report, recordError }: Props) {
       <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Trades</span><span>Lived</span><span>Return</span><span>How it ended</span><span>Check it</span></div>
       {rows.length === 0 ? <div className="empty">{problem ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
         : rows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
-          <span>{g.bot_id}</span><span className="struck">{g.ens_name}</span><span>{brainName(g.brain)}</span><span>{g.trades ?? '—'}</span>
+          <span>{g.bot_id}</span><span><span className="struck">{g.ens_name}</span>{g.approval === 'demo' && <span className="muted" title="Approved without World ID (demo approval)"> · demo</span>}</span><span>{brainName(g.brain)}</span><span>{g.trades ?? '—'}</span>
           <span>{lived(g.lifetime_s)}</span><span className={trend(g.pnl_bps)}>{pct(g.pnl_bps)}</span>
           <span>{causeName(g.cause)}</span>
           <span className="links"><OutLink href={g.arkiv_url}>Arkiv</OutLink><OutLink href={g.tx_url}>tx</OutLink></span>

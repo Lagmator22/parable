@@ -73,10 +73,17 @@ class ApprovalStore:
         self._attempts: dict[str, _Attempt] = {}
         self._approvals: dict[str, Approval] = {}
         self._pending: set[str] = set()  # launch ids created by Parable's own server
+        self._demo: set[str] = set()  # launch ids the person chose to approve WITHOUT World ID (marked "demo")
 
-    def register_pending(self, pending_id: str) -> None:
+    def register_pending(self, pending_id: str, demo: bool = False) -> None:
         with self._lock:
             self._pending.add(pending_id)
+            if demo:
+                self._demo.add(pending_id)
+
+    def is_demo(self, pending_id: str) -> bool:
+        with self._lock:
+            return pending_id in self._demo
 
     def is_pending(self, pending_id: str) -> bool:
         with self._lock:
@@ -133,9 +140,15 @@ def get_approval(pending_id: str) -> Approval | None:
     return store.get(pending_id)
 
 
-def register_pending(pending_id: str) -> None:
-    """The launcher calls this, so /world/start only works for launches our server created."""
-    store.register_pending(pending_id)
+def register_pending(pending_id: str, demo: bool = False) -> None:
+    """The launcher calls this, so /world/start only works for launches our server created.
+    demo=True: the person chose "demo approval" (no World App); the bot is marked "demo" in its record."""
+    store.register_pending(pending_id, demo)
+
+
+def demo_allowed() -> bool:
+    """Demo approval lets people try Parable without World App. Set WORLD_ALLOW_DEMO=0 to switch it off."""
+    return os.environ.get("WORLD_ALLOW_DEMO", "1") != "0"
 
 
 # ---------------------------------------------------------------- config
@@ -292,7 +305,7 @@ def start(purpose: str = Query(...), ref: str = Query(...)):
         raise HTTPException(400, "invalid ref")
     if not store.is_pending(ref):
         raise HTTPException(404, "unknown launch id: start the launch from Parable first")
-    if _mock():
+    if _mock() or (store.is_demo(ref) and demo_allowed()):
         attempt = store.new_attempt(ref)
         form = lambda decision, label: (  # noqa: E731
             f"<form method=post action='/world/mock/decision' style='display:inline'>"
@@ -300,7 +313,8 @@ def start(purpose: str = Query(...), ref: str = Query(...)):
             f"<input type=hidden name=decision value={decision}><button>{label}</button></form>"
         )
         body = (
-            "<p class=mock><b>MOCK World ID</b>: no real proof is checked (WORLD_MOCK=1).</p>"
+            "<p class=mock><b>Demo approval</b>: no World App, no human check. The bot is marked "
+            "<b>demo</b> on the public register so it never counts as human-verified.</p>"
             f"<h1>Approve bot launch?</h1><p>Launch <code>{html.escape(ref)}</code> needs a human approval.</p>"
             f"{form('approve', 'Approve')}{form('deny', 'Deny')}"
         )
@@ -324,16 +338,16 @@ def start(purpose: str = Query(...), ref: str = Query(...)):
 
 @router.post("/mock/decision")
 def mock_decision(state: str = Form(...), decision: str = Form(...)):
-    if not _mock():
-        raise HTTPException(404)
     attempt, problem = store.consume(state)
     if problem or attempt is None:
         return _bad_request(f"state {problem}")
+    if not (_mock() or (store.is_demo(attempt.pending_id) and demo_allowed())):
+        raise HTTPException(404)
     if int(time.time()) - attempt.created_at > STATE_TTL_S:
         return _outcome(attempt.pending_id, "", False, "expired: approval took longer than 10 minutes")
     if decision == "approve":
         subject = os.environ.get("WORLD_MOCK_SUBJECT", "mock-human-demo")
-        return _outcome(attempt.pending_id, subject, True, "approved (mock World ID)")
+        return _outcome(attempt.pending_id, subject, True, "approved (demo approval, no World ID)")
     return _outcome(attempt.pending_id, "", False, "denied by user (mock World ID)")
 
 

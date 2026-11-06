@@ -188,7 +188,7 @@ def test_alg_none_rejected(client, monkeypatch):
 def _mock_state(client, ref="m1"):
     wp.register_pending(ref)
     r = client.get("/world/start", params={"purpose": "launch_bot", "ref": ref})
-    assert r.status_code == 200 and "MOCK" in r.text
+    assert r.status_code == 200 and "Demo approval" in r.text
     return re.search(r"name=state value='([^']+)'", r.text).group(1)
 
 
@@ -220,8 +220,24 @@ def test_mock_replay_and_expiry(client, monkeypatch):
     assert not wp.get_approval("m2").approved
 
 
-def test_mock_endpoint_disabled_without_flag(client):
-    assert client.post("/world/mock/decision", data={"state": "x", "decision": "approve"}).status_code == 404
+def test_mock_endpoint_refuses_unknown_state_without_flag(client):
+    # No mock flag and no demo launch: a made-up state is refused (never approves anything).
+    assert client.post("/world/mock/decision", data={"state": "x", "decision": "approve"}).status_code in (400, 404)
+
+
+def test_demo_approval_works_only_for_launches_marked_demo(client, monkeypatch):
+    monkeypatch.delenv("WORLD_MOCK", raising=False)
+    wp.register_pending("real-1")
+    wp.register_pending("demo-1", demo=True)
+    assert "Demo approval" not in client.get("/world/start", params={"purpose": "launch_bot", "ref": "real-1"}, follow_redirects=False).text
+    page = client.get("/world/start", params={"purpose": "launch_bot", "ref": "demo-1"})
+    assert page.status_code == 200 and "Demo approval" in page.text
+    state = page.text.split("name=state value='")[1].split("'")[0]
+    client.post("/world/mock/decision", data={"state": state, "decision": "approve"})
+    assert wp.get_approval("demo-1").approved and "demo" in wp.get_approval("demo-1").reason
+    monkeypatch.setenv("WORLD_ALLOW_DEMO", "0")
+    wp.register_pending("demo-2", demo=True)
+    assert "Demo approval" not in client.get("/world/start", params={"purpose": "launch_bot", "ref": "demo-2"}, follow_redirects=False).text
 
 
 def test_retry_after_denial_can_approve_but_approval_is_final(client, monkeypatch):

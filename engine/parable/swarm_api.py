@@ -39,6 +39,7 @@ class SwarmRequest(BaseModel):
     workers: list[str] = Field(default_factory=lambda: ["rule"])
     bots: int = 3
     minutes: int = 15
+    approval: str = "world"  # or "demo": no World App, every worker marked "demo"
 
 
 @router.get("/api/swarm")
@@ -49,7 +50,7 @@ def swarm_status():
 @router.post("/api/swarm/start")
 def swarm_start(req: SwarmRequest):
     try:
-        pid, claim = get_manager().start(req.mind, req.workers, req.bots, req.minutes)
+        pid, claim = get_manager().start(req.mind, req.workers, req.bots, req.minutes, demo=req.approval == "demo")
     except LaunchError as err:
         raise HTTPException(400, str(err))
     # The same World ID check as launching one bot; the approval covers the whole swarm.

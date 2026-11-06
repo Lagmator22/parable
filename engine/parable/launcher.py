@@ -95,7 +95,7 @@ class Launcher:
         pending_id = "p-" + secrets.token_hex(12)
         claim = secrets.token_urlsafe(24)
         self.pending[pending_id] = (rules, claim)
-        self.b.world.register_pending(pending_id)
+        self.b.world.register_pending(pending_id, demo=rules.approval == "demo")
         return pending_id, claim
 
     def confirm_launch(self, pending_id: str, claim: str) -> BotRecord:
@@ -308,6 +308,12 @@ class Launcher:
     # ---------------------------------------------------------------- read helpers
     def report(self, creator_id: str | None, strategy: str | None, brain: str | None = None):
         card = self.b.arkiv.report_card(creator_id, strategy, brain=brain)
+        if not creator_id and not strategy and not brain and hasattr(self.b.vault, "total_born"):
+            try:  # the whole register: Arkiv's count must equal every bot the vault ever registered
+                card = card.model_copy(update={"vault_count_matches": card.launched == self.b.vault.total_born()})
+            except Exception:
+                log.warning("could not read the vault's total")
+            return card
         if creator_id and not brain:  # compare Arkiv's count with the vault's own count (it cannot split by brain)
             try:
                 born, _dead = self.b.vault.counts(creator_id)

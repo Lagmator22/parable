@@ -22,7 +22,7 @@ class FakeWorld:
         self.approvals[pending_id] = Approval(pending_id=pending_id, subject="human-1", approved=approved,
                                               reason="ok" if approved else "denied", at=int(time.time()))
 
-    def register_pending(self, pending_id):
+    def register_pending(self, pending_id, demo=False):
         pass
 
     def get_approval(self, pending_id):
