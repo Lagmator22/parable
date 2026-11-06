@@ -88,6 +88,7 @@ h1, h2, h3, h4, p, dl, dd { margin: 0; }
 .row:hover { background: var(--hover); }
 .row.head { color: var(--grey); font-size: 12px; border-bottom: 1px solid var(--ink); }
 .row.head:hover { background: none; }
+.row.head > span:only-child { grid-column: 1 / -1; }
 .struck { text-decoration: line-through; }
 .register .row { grid-template-columns: 44px minmax(0, 3fr) minmax(0, 2fr) 80px 80px minmax(0, 2.4fr) 40px; }
 .deaths .row { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -185,9 +186,30 @@ details.box > summary span { display: block; font-size: 15px; color: var(--grey)
 .how-list p { font-size: 15px; color: var(--grey); }
 footer .wrap { padding-top: 22px; padding-bottom: 22px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; font: 13px var(--mono); }
 
+/* telemetry: a panel that slides down from the top bar */
+.tele-btn { height: 44px; padding: 0 14px; border: 1px solid var(--ink); background: none; font: 500 13px var(--mono); display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.tele-btn:hover, .tele-btn[aria-expanded=true] { background: var(--ink); color: var(--paper); }
+.tele { position: fixed; z-index: 40; top: 0; left: 0; right: 0; max-height: 92vh; overflow-y: auto; background: var(--paper);
+  border-bottom: 2px solid var(--ink); transform: translateY(-102%); transition: transform .38s cubic-bezier(.2, .8, .2, 1); }
+.tele.open { transform: none; }
+.tele-scrim { position: fixed; inset: 0; z-index: 39; background: #0b0b0b66; opacity: 0; pointer-events: none; transition: opacity .3s; }
+.tele-scrim.open { opacity: 1; pointer-events: auto; }
+.tele-inner { padding-top: 20px; padding-bottom: 28px; display: flex; flex-direction: column; gap: 18px; }
+.tele-title { font-size: 32px; font-weight: 900; letter-spacing: -.03em; display: flex; align-items: center; gap: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1px solid var(--ink); background: var(--card); }
+.kpis > div { padding: 12px 14px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.kpis dt { font: 11px var(--mono); color: var(--grey); }
+.kpis dd { font: 900 26px var(--head); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tele-charts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.tele-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; }
+.tele-agents .row { grid-template-columns: 18px minmax(0, 2.4fr) minmax(0, 1.6fr) 80px 70px 52px 60px 110px; }
+.verify .row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+
 /* phones */
 @media (max-width: 900px) {
-  .hero > .wrap:not(.facts), .bot, .charts { grid-template-columns: 1fr; }
+  .hero > .wrap:not(.facts), .bot, .charts, .tele-charts, .tele-split { grid-template-columns: 1fr; }
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tele-agents .row { grid-template-columns: 18px minmax(0, 1fr) 70px 60px; } .tele-agents .row > :nth-child(3), .tele-agents .row > :nth-child(4), .tele-agents .row > :nth-child(6), .tele-agents .row > :nth-child(8) { display: none; }
   .bot-side { border-right: 0; border-bottom: 1px solid var(--ink); }
   .section > .wrap { grid-template-columns: 1fr; }
   .section.hero > .wrap.facts, .how-list { grid-template-columns: 1fr 1fr; }
@@ -205,4 +227,4 @@ footer .wrap { padding-top: 22px; padding-bottom: 22px; display: flex; flex-wrap
   .facts > div { padding-left: 0; } .how-list li + li { padding-left: 0; border-left: 0; }
   .log .row { grid-template-columns: 64px minmax(0, 1fr); } .log .row > :nth-child(3) { display: none; }
 }
-@media (prefers-reduced-motion: reduce) { .live { animation: none; } html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) { .live { animation: none; } html { scroll-behavior: auto; } .tele, .tele-scrim { transition: none; } }

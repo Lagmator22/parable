@@ -43,7 +43,7 @@ export function useDashboard() {
       const byBot: Record<number, Event[]> = {};
       events.forEach((result, index) => {
         if (result.status === 'fulfilled') {
-          byBot[live[index].bot_id] = result.value.slice(0, 5);
+          byBot[live[index].bot_id] = result.value;  // all of them: the telemetry page counts trades and refusals
           if (result.value[0]) latest[live[index].bot_id] = result.value[0];
         }
       });

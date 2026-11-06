@@ -77,5 +77,12 @@ test('renders sections in demo order, plain words, no emoji, and only launched b
   expect(text).not.toMatch(/LIVE ·|SIMULATION|proof/i);  // no shouting tags
   expect(text).not.toMatch(/\p{Extended_Pictographic}/u);  // our own icons, never emoji
   expect(host.querySelector('.register .struck')?.textContent).toBe('bot-2.parable.eth');  // dead names struck through
+  // The telemetry panel starts closed (hidden from screen readers) and opens from the top bar.
+  const panel = host.querySelector('aside.tele')!;
+  expect(panel.getAttribute('aria-hidden')).toBe('true');
+  await act(async () => host.querySelector<HTMLButtonElement>('.tele-btn')!.click());
+  expect(panel.classList.contains('open')).toBe(true);
+  expect(panel.textContent).toContain('Check it yourself');
+  expect(panel.querySelector('a[href="https://sepolia.etherscan.io/address/0xvault"]')).not.toBeNull();
   await act(async () => root.unmount());
 });

@@ -11,6 +11,7 @@ import { Launch } from './dashboard/Launch';
 import { Live } from './dashboard/Live';
 import { Register } from './dashboard/Record';
 import { Swarm } from './dashboard/Swarm';
+import { Telemetry } from './dashboard/Telemetry';
 import { causeName, pct, type Info } from './dashboard/api';
 import { useDashboard } from './dashboard/useDashboard';
 
@@ -40,8 +41,12 @@ function Facts({ info }: { info: Info | null }) {
 
 export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
+  const [tele, setTele] = useState(false);
   const d = useDashboard();
   const switching = useRef(false);
+  useEffect(() => {  // no page scrolling behind the open telemetry panel
+    document.body.style.overflow = tele ? 'hidden' : '';
+  }, [tele]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try { localStorage.setItem('parable-theme', theme); } catch { /* private browsing */ }
@@ -61,9 +66,11 @@ export default function App() {
     <header className="topbar"><div className="wrap">
       <a className="brand" href="#top"><Tomb size={18}/>PARABLE</a>
       <nav aria-label="Sections">{NAV.map(([label, href]) => <a key={href} href={href}>{label}</a>)}</nav>
+      <button type="button" className="tele-btn" aria-expanded={tele} onClick={() => setTele(t => !t)}>{d.bots.length > 0 && <span className="live"/>}Telemetry</button>
       <button type="button" className="square-btn" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
         {theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}</button>
     </div></header>
+    <Telemetry open={tele} onClose={() => setTele(false)} info={d.info} bots={d.bots} botEvents={d.botEvents} series={d.series} swarm={d.swarm} report={d.report}/>
     <main id="top">
       {d.info?.offline && <div className="notice" role="status">Practice mode: this server runs a pretend chain. Nothing here is on Sepolia.</div>}
       {d.error && <div className="notice" role="status">Can’t reach the server right now: {d.error}</div>}
