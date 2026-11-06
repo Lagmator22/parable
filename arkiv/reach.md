@@ -22,17 +22,11 @@ Why they would actually use it:
    - The **Compare Brains** table (`GET /api/report/brains`) aggregating `parable.bot` and `parable.death` rows across `rule`, `gemini:gemini-3.5-flash-lite`, and other brains.
 2. **Direct Arkiv query (no Parable server needed):** Anyone can query our writer wallet's entities directly on Rabdi (`chainId: 7794095`, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network`):
    ```bash
-   curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network \
-     -H "content-type: application/json" \
-     -d '{
-       "jsonrpc": "2.0",
-       "id": 1,
-       "method": "arkiv_query",
-       "params": [
-         "arkiv.schema = str(\"parable.death\") && $owner = addr(0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570)",
-         {"select": {"key": true, "attributes": true}}
-       ]
-     }'
+   curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network -H "content-type: application/json" --data @- <<'EOF'
+   {"jsonrpc": "2.0", "id": 1, "method": "arkiv_query", "params": [
+     "arkiv.schema = str('parable.death') AND vault = str('0x5432be5713f358225d648eab2ec9f699b25ef317') AND $owner = addr(0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570)",
+     {"select": {"key": true, "attributes": true}}]}
+   EOF
    ```
 3. **Via MCP (Claude Code / OpenAI Codex / Cursor):** Run `cd engine && uv run python -m parable.mcp_server` and call `graveyard()`, `report_card()`, or `compare_brains()`.
 

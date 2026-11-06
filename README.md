@@ -69,17 +69,11 @@ Anyone selling or showcasing an AI trading agent today can play a simple trick: 
 - **Sample Rabdi Transactions:** [Bot Entity](https://rabdi.explorer.arkiv.network/tx/0x19865c864b2dce647f6c3041afdec6c178a3848cf9a0dfaf08f57f1f06a45fb3) · [Birth Event](https://rabdi.explorer.arkiv.network/tx/0x98b24330b21fb990bcee3a1d5dab8916cb9a16fe95cb1a132efed5adebe89615) · [Death / Graveyard Entity](https://rabdi.explorer.arkiv.network/tx/0xc5714abb242c6d3eddc8a79272097f1febe88886dbe8fd7239dfdd6c8b150f15)
 - **Runnable Query (anyone can run directly in a terminal, zero setup):**
   ```bash
-  curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network \
-    -H "content-type: application/json" \
-    -d '{
-      "jsonrpc": "2.0",
-      "id": 1,
-      "method": "arkiv_query",
-      "params": [
-        "arkiv.schema = str(\"parable.death\") && $owner = addr(0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570)",
-        {"select": {"key": true, "attributes": true}}
-      ]
-    }'
+  curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network -H "content-type: application/json" --data @- <<'EOF'
+  {"jsonrpc": "2.0", "id": 1, "method": "arkiv_query", "params": [
+    "arkiv.schema = str('parable.death') AND vault = str('0x5432be5713f358225d648eab2ec9f699b25ef317') AND $owner = addr(0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570)",
+    {"select": {"key": true, "attributes": true}}]}
+  EOF
   ```
 
 ---
@@ -141,6 +135,8 @@ cd contracts && forge test
   - **Operator bridges World ID OIDC to `registerBot`:** World ID is validated server-side via OIDC + PyJWT before the operator calls `registerBot`; verifying a World ID ZK proof directly inside `registerBot` is the next upgrade.
   - **In-memory bot keys by design:** Bot private keys live only in server RAM. If the server restarts, running bots simply stop trading and expire into the graveyard once their lease ends (`repair.py` reconciles any gap between `ParableVault` and Arkiv every 60 seconds).
   - **Code fingerprint (`code_hash`) is a commitment:** Proves which strategy/brain configuration was committed to the ENSv2 badge at birth; proving remote execution requires a TEE.
+  - **Flat testnet price → small signal nudges for decisions only:** Sepolia's Chainlink ETH/USD feed updates about once an hour. So that a 10-minute demo bot has something to react to, the bot's *decision input* gets small ±0.1–0.25% nudges when the price hasn't moved. **Every trade still settles inside the vault at the real Chainlink price**, and the vault alone measures profit and loss, so no score can be faked. On mainnet (fast-updating feeds) the nudge is unnecessary.
+  - **Market Arena is a simulation:** the `#arena` benchmark replays scripted market regimes against an in-memory copy of the vault rules. It is clearly separate from the real Sepolia bots and never touches the real vault or Arkiv counts.
 
 ---
 

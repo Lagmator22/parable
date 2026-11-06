@@ -62,3 +62,4 @@ All observations below come from live testnet runs on **2026-11-06**.
 - **Minor friction:**
   - Writing from an unfunded wallet returns `Transaction failed: Execution error without revert data` instead of `insufficient balance for gas (use the Rabdi faucet)`.
   - `createEntity` requires a `defineSchema(...)` object even for a dynamic bridge that receives attribute types at runtime; we construct `defineSchema(name, columns)` dynamically per call.
+  - **Query syntax changed during the hackathon:** our README query using `&&` and `str("...")` started failing with `symbol operators (&& || ~) were removed — use AND, OR, STARTSWITH` and then `str takes a single-quoted string`. The error messages were excellent (they said exactly what to change), but the docs/examples we had copied still showed the old syntax. Suggestion: version the query language and keep a changelog link in the error message.
