@@ -133,7 +133,7 @@ Chainlink, Definitive: TBA.
 
 | Phase (IST) | Hours | Output |
 |---|---|---|
-| Thu 21:00–22:00 | H0–1 | New repo, AGENTS.md copied, README disclosure, `AI_USAGE.md`, `SPEC.md` (idea, sponsor tracks targeted, requirement checklist), architecture sketch. Commit. |
+| Thu 21:00–22:00 | H0–1 | New repo, AGENTS.md copied, README disclosure, `AI_USAGE.md`, `FINAL_PLAN.md` (idea, sponsor tracks targeted, requirement checklist), architecture sketch. Commit. |
 | Thu 22:00–Fri 01:00 | H1–4 | **De-risk**: hello-world for every sponsor integration (one tx / one API call each). If one fails badly → swap sponsor now, not later. |
 | Fri 01:00–08:00 | H4–11 | Core happy path end-to-end (ugly is fine). Nap ~3h in here when blocked/tired. |
 | Fri 08:00–18:00 | H11–21 | Sponsor-specific requirements + "extra points" items, 2nd/3rd sponsor depth, error/denied paths. Booth check-ins for feedback. |
@@ -145,7 +145,7 @@ Chainlink, Definitive: TBA.
 **Agent conventions during the hack**
 - Python first; ask before adding a new language/framework.
 - Never commit secrets: `.env` + `.env.example`; private keys only testnet.
-- Every sponsor requirement gets a checkbox in `SPEC.md`; tick it only with evidence (tx hash, request ID, explorer link).
+- Every sponsor requirement gets a checkbox in `FINAL_PLAN.md`; tick it only with evidence (tx hash, request ID, explorer link).
 - Append to `AI_USAGE.md` whenever AI generates a meaningful chunk (what, which tool, what I changed).
 - Commit after every working increment; push at least hourly.
 - Prefer testnets; capture tx hashes/explorer links into README as they happen (needed for submissions).
