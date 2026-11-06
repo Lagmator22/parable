@@ -68,15 +68,16 @@ def list_brains() -> list[dict]:
 
 @mcp.tool()
 def launch_bot(brain: str = "jev:deepseek-v4.1-flash", strategy: str = "yolo", cash_dollars: float = 100,
-               max_trade_dollars: float = 20, max_loss_percent: float = 10, minutes: int = 10) -> dict:
-    """Start a bot launch. Returns an approve_url: a human must open it and approve with World ID.
+               max_trade_dollars: float = 20, max_loss_percent: float = 10, minutes: int = 10, approval: str = "world") -> dict:
+    """Start a bot launch. Returns an approve_url: a human must open it and approve with World ID
+    (approval="world"), or press Approve on a demo page (approval="demo": no World App; the bot is marked "demo").
     Then call confirm_launch(pending_id, claim) until the bot is born (about a minute)."""
     r = call("POST", "/api/launch", json={"brain": brain, "strategy": strategy, "start_cash_usd": int(cash_dollars * 1e6),
                                          "max_trade_usd": int(max_trade_dollars * 1e6), "max_loss_bps": int(max_loss_percent * 100),
-                                         "lease_seconds": minutes * 60})
+                                         "lease_seconds": minutes * 60, "approval": approval})
     if "error" in r:
         return r
-    return {**r, "approve_url": base_url() + r["approve_url"], "next": "Open approve_url, approve in World App, then call confirm_launch."}
+    return {**r, "approve_url": base_url() + r["approve_url"], "next": "Open approve_url, approve, then call confirm_launch."}
 
 
 @mcp.tool()
@@ -144,11 +145,12 @@ def stop_bot(bot_id: int, owner_token: str) -> dict:
 
 
 @mcp.tool()
-def start_swarm(mind: str = "gemini:gemini-3.5-flash-lite", workers: list[str] | None = None, minutes: int = 15) -> dict:
+def start_swarm(mind: str = "gemini:gemini-3.5-flash-lite", workers: list[str] | None = None, minutes: int = 15,
+                approval: str = "world") -> dict:
     """Start a swarm: one mind model checks the workers every minute. workers is a list like
     ["jev:deepseek-v4.1-flash", "gemini:gemini-3.5-flash-lite", "rule"]. Returns an approve_url for World ID."""
     workers = workers or ["jev:deepseek-v4.1-flash", "gemini:gemini-3.5-flash-lite", "rule"]
-    r = call("POST", "/api/swarm/start", json={"mind": mind, "workers": workers, "bots": len(workers), "minutes": minutes})
+    r = call("POST", "/api/swarm/start", json={"mind": mind, "workers": workers, "bots": len(workers), "minutes": minutes, "approval": approval})
     return r if "error" in r else {**r, "approve_url": base_url() + r["approve_url"], "next": "Approve, then call confirm_swarm."}
 
 
