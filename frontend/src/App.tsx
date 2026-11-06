@@ -1,12 +1,14 @@
-// This simple landing page explains Parable and links to its real sections.
-// The full application views will be connected to the Python engine later.
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Moon, Sun, X } from 'lucide-react';
 import { ScrambleButton, ScrambleLink } from './components/ui/ScrambleButton';
+import { Launch } from './dashboard/Launch';
+import { Live } from './dashboard/Live';
+import { Record } from './dashboard/Record';
+import { useDashboard } from './dashboard/useDashboard';
 
 type Theme = 'dark' | 'light';
-const nav = [{ label: 'Home', href: '#top' }, { label: 'Launch a bot', href: '/classic' }, { label: 'How it works', href: '#how' }, { label: 'Why trust it', href: '#trust' }];
+const nav = [{ label: 'Home', href: '#top' }, { label: 'Launch', href: '#launch' }, { label: 'Live bots', href: '#live' }, { label: 'Graveyard', href: '#graveyard' }, { label: 'Compare brains', href: '#compare' }, { label: 'Test the vault', href: '#proof' }, { label: 'How it works', href: '#how' }];
 
 function savedTheme(): Theme {
   try { return localStorage.getItem('parable-theme') === 'light' ? 'light' : 'dark'; }
@@ -16,6 +18,7 @@ function savedTheme(): Theme {
 export default function App() {
   const [theme, setTheme] = useState<Theme>(savedTheme);
   const [menuOpen, setMenuOpen] = useState(false);
+  const dashboard = useDashboard();
   const switching = useRef(false);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -59,15 +62,17 @@ export default function App() {
     </header>
     <nav id="page-menu" className={`menu-overlay ${menuOpen ? 'open' : ''}`} aria-hidden={!menuOpen}>
       <div className="menu-head"><span>Navigate</span><button className="close-menu" onClick={() => setMenuOpen(false)} aria-label="Close menu"><X size={26}/></button></div>
-      <div className="menu-links">{nav.map((link, index) => <ScrambleLink key={link.href} label={`${String(index + 1).padStart(2, '0')}  ${link.label}`} href={link.href} onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1} arrow />)}</div>
+      <div className="menu-links">{nav.map(link => <ScrambleLink key={link.href} label={link.label} href={link.href} onClick={() => setMenuOpen(false)} tabIndex={menuOpen ? 0 : -1} arrow />)}</div>
       <p>Every strategy has a graveyard. Now you can see it.</p>
     </nav>
     <main inert={menuOpen}>
+      {dashboard.info?.offline && <div className="offline-banner" role="status">Offline simulation: trades and identities here are practice data.</div>}
+      {dashboard.error && <div className="engine-error" role="status">Public record unavailable: {dashboard.error}</div>}
       <section className="hero">
         <div className="hero-copy">
           <h1>Every bot.<br/>Every trade.<br/><span>Every failure.</span></h1>
           <p>Creators can show you their winners. Parable shows you the whole record, including the bots that died.</p>
-          <div className="hero-actions"><ScrambleLink label="Launch a bot" href="/classic" arrow className="main-action"/><ScrambleLink label="See how it works" href="#how"/></div>
+          <div className="hero-actions"><ScrambleLink label="Launch a bot" href="#launch" arrow className="main-action"/><ScrambleLink label="See how it works" href="#how"/></div>
         </div>
         <div className="hero-visual" aria-label="Illustration of a bot's public history">
           <h2 className="visual-title">A bot's public history</h2>
@@ -76,6 +81,9 @@ export default function App() {
           <div className="visual-line"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></div>
         </div>
       </section>
+      <Launch info={dashboard.info} brains={dashboard.brains} onBorn={creator => { dashboard.setCreator(creator); void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
+      <Live bots={dashboard.bots} creator={dashboard.creator} onRefresh={() => { void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
+      <Record graves={dashboard.graves} report={dashboard.report} comparison={dashboard.comparison} bots={dashboard.bots} creator={dashboard.creator} info={dashboard.info} recordError={dashboard.recordError}/>
       <section className="content-section" id="how">
         <div className="section-heading"><h2>Bots don’t keep<br/>their own score.</h2><p>A bot can request a trade. The vault decides whether it is allowed, holds the practice money, and records what happened.</p></div>
         <div className="feature-grid">

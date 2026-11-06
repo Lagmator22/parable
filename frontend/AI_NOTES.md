@@ -15,3 +15,5 @@ Reference: [Halftone Wordmark Footer](https://21st.dev/@kedhareswer/components/h
 - 2026-11-06: Codex linked the React landing and menu to the existing `/classic` bot-launch page, and proxied that route and its static assets in Vite development. No engine code changed.
 
 - 2026-11-06: Codex revised the public-history card after user feedback. The three steps now share one row layout, larger numbered tiles, consistent title and description sizes, and tighter spacing in desktop and phone layouts. User review pending.
+
+- 2026-11-06: Codex integrated the Python engine's documented API into the existing React design. The page now has World approval launch, live bots and vault actions, Arkiv graveyard and report card, brain comparison, and vault attack checks. Added safe API errors, contract unit formatting, browser token storage, timed polling, and tests. The backend and its `/classic` fallback were not changed. User review pending.
