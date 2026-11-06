@@ -46,8 +46,9 @@ class Settings(BaseSettings):
     bot_model: str = "claude-haiku-5-5"
     # Other bot brains (a bot picks one at launch). Gemini and Gemma share one Google key.
     gemini_api_key: str = ""
-    gemini_model: str = ""
-    gemma_model: str = "gemma-4-31b-it"
+    # Comma-separated model lists: every model becomes its own brain ("gemini:<model>", "gemma:<model>").
+    gemini_models: str = ""
+    gemma_models: str = ""
     # Any local OpenAI-style server (Ollama). No key needed.
     local_llm_base_url: str = "http://localhost:11434/v1"
     local_llm_model: str = ""

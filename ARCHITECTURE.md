@@ -196,12 +196,12 @@ Each bot is launched with one "brain" (the thing that decides buy, sell or hold)
   Every 30 seconds the bot asks its brain:
      rule    free built-in rule ............ always works
      claude  Anthropic (needs key)
-     gemini  Google, flash model ┐
-     gemma   Google, Gemma model ┴ same Google key
+     gemini:<model>  one brain per Gemini model ┐ same Google key,
+     gemma:<model>   one brain per Gemma model  ┘ listed in .env
      local   your own computer (Ollama), no key
         │
-        ├── brain answers fine ──▶ trade (size cut down to the safe limit)
-        └── brain fails or answers nonsense ──▶ the free rule decides instead,
+        ├── brain answers fine ──▶ trade (AI answers in plain dollars; size cut down to the safe limit)
+        └── brain fails, times out (30 s) or answers nonsense ──▶ the free rule decides instead,
                                                 note starts with "[fallback:rule]"
         ▼
   Vault checks the real limits anyway ──▶ every bot record and grave remembers its brain

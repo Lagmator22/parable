@@ -19,7 +19,7 @@ from parable import world_pass
 from parable.config import get_settings
 from parable.launcher import ApprovalDenied, ApprovalPending, Launcher, LaunchError, real_backends, to_bytes32
 from parable.bot_runner import available_brains
-from parable.models import Brain, BotRules
+from parable.models import BotRules
 
 STATIC = Path(__file__).parent / "static"
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
@@ -70,7 +70,7 @@ class LaunchRequest(BaseModel):
     max_trade_usd: int = 20_000_000  # $20 per trade
     max_loss_bps: int = 1000  # 10% (1 bps = 0.01%)
     lease_seconds: int = 3600
-    brain: Brain = "rule"  # an unknown name is rejected with 422 by the model
+    brain: str = "rule"
 
 
 def vault_call(fn, *args):
@@ -97,7 +97,10 @@ def brains():
 
 @app.post("/api/launch")
 def launch(req: LaunchRequest):
-    if not available_brains()[req.brain]:  # a quiet fallback would spoil the brain comparison, so refuse
+    known = available_brains()
+    if req.brain not in known:
+        raise HTTPException(422, f"unknown brain '{req.brain}'")
+    if not known[req.brain]:  # a quiet fallback would spoil the brain comparison, so refuse
         raise HTTPException(400, f"brain '{req.brain}' is not set up on this server")
     pending_id, claim = get_launcher().start_launch(BotRules(**req.model_dump()))
     # the claim token stays in the requester's browser; only they can confirm this launch

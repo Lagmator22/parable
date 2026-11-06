@@ -80,19 +80,21 @@ def test_brains_lists_each_brain_without_any_key(client, monkeypatch):
     s = api.get_settings()
     monkeypatch.setattr(s, "gemini_api_key", "SECRET-GOOGLE-KEY")
     monkeypatch.setattr(s, "anthropic_api_key", "SECRET-CLAUDE-KEY")
-    monkeypatch.setattr(s, "gemini_model", "gem-model")
+    monkeypatch.setattr(s, "gemini_models", "gem-model,gem-two")
+    monkeypatch.setattr(s, "gemma_models", "")
     monkeypatch.setattr(s, "local_llm_model", "")
     c, _, _ = client
     r = c.get("/api/brains")
-    assert "SECRET" not in r.text and "gem-model" not in r.text
+    assert "SECRET" not in r.text
     found = {b["brain"]: b["available"] for b in r.json()}
-    assert found == {"rule": True, "claude": True, "gemini": True, "gemma": True, "local": False}
+    assert found == {"rule": True, "claude": True, "local": False, "gemini:gem-model": True, "gemini:gem-two": True}
 
 
 def test_launch_with_unconfigured_brain_is_rejected(client, monkeypatch):
     monkeypatch.setattr(api.get_settings(), "gemini_api_key", "")
+    monkeypatch.setattr(api.get_settings(), "gemini_models", "m")
     c, _, lau = client
-    assert c.post("/api/launch", json={"brain": "gemini"}).status_code == 400
+    assert c.post("/api/launch", json={"brain": "gemini:m"}).status_code == 400
     assert lau.pending == {}  # nothing was started
 
 
@@ -104,14 +106,14 @@ def test_launch_with_unknown_brain_is_rejected(client):
 def test_brain_travels_to_bot_graveyard_and_report(client, monkeypatch):
     s = api.get_settings()
     monkeypatch.setattr(s, "gemini_api_key", "k")
-    monkeypatch.setattr(s, "gemini_model", "m")
+    monkeypatch.setattr(s, "gemini_models", "m")
     c, world, _ = client
-    body = c.post("/api/launch", json={"brain": "gemini"}).json()
+    body = c.post("/api/launch", json={"brain": "gemini:m"}).json()
     world.decide(body["pending_id"], True)
     out = c.post(f"/api/launch/{body['pending_id']}/confirm", headers={"x-claim": body["claim"]}).json()
     bot = out["bot"]
-    assert bot["rules"]["brain"] == "gemini"
+    assert bot["rules"]["brain"] == "gemini:m"
     c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": out["owner_token"]})
-    assert c.get(f"/api/graveyard/{bot['creator_id']}").json()[0]["brain"] == "gemini"
-    assert c.get("/api/report", params={"brain": "gemini"}).json()["dead"] == 1
+    assert c.get(f"/api/graveyard/{bot['creator_id']}").json()[0]["brain"] == "gemini:m"
+    assert c.get("/api/report", params={"brain": "gemini:m"}).json()["dead"] == 1
     assert c.get("/api/report", params={"brain": "rule"}).json()["launched"] == 0
