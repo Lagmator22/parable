@@ -92,7 +92,8 @@ svg text::selection { fill: #fff; }
 .row.head:hover { background: none; }
 .row.head > span:only-child { grid-column: 1 / -1; }
 .struck { text-decoration: line-through; }
-.register .row { grid-template-columns: 44px minmax(0, 3fr) minmax(0, 2fr) 80px 80px minmax(0, 2.4fr) 40px; }
+.register .row { grid-template-columns: 40px minmax(0, 3fr) minmax(0, 2fr) 60px 64px 64px minmax(0, 2.2fr) 104px; }
+.links { display: flex; gap: 12px; }
 .deaths .row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .log .row { grid-template-columns: 76px minmax(0, 1fr) auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 28px; font: 13px var(--mono); color: var(--grey); }
@@ -222,7 +223,7 @@ footer .wrap { padding-top: 22px; padding-bottom: 22px; display: flex; flex-wrap
   .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); } .steps li:nth-child(3) { border-right: 0; } .steps li:nth-child(-n+3) { border-bottom: 1px solid var(--ink); }
   .attempt { grid-template-columns: 1fr; gap: 10px; }
   .swarm-form { grid-template-columns: 1fr; } .swarm-form > div:nth-child(odd) { border-right: 0; }
-  .register .row { grid-template-columns: 32px minmax(0, 1fr) 70px; } .register .row > :nth-child(3), .register .row > :nth-child(4), .register .row > :nth-child(6), .register .row > :nth-child(7) { display: none; }
+  .register .row { grid-template-columns: 32px minmax(0, 1fr) 50px 90px; } .register .row > :nth-child(3), .register .row > :nth-child(5), .register .row > :nth-child(6), .register .row > :nth-child(7) { display: none; }
   .swarm-table .row { grid-template-columns: 24px minmax(0, 1fr) 70px 60px; } .swarm-table .row > :nth-child(3), .swarm-table .row > :nth-child(6), .swarm-table .row > :nth-child(7) { display: none; }
   .decisions .row { grid-template-columns: 60px minmax(0, 1fr); } .decisions .row > :nth-child(2), .decisions .row > :nth-child(4) { display: none; }
 }

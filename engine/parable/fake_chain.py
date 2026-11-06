@@ -175,6 +175,16 @@ class FakeArkiv:
                 r.status = "dead"
         return f"fake-death-{d.bot_id}"
 
+    def death_keys(self):
+        return {d.bot_id: f"0xfake{d.bot_id:060x}" for d, _, _ in self.deaths}
+
+    def trade_counts(self):
+        counts = {}
+        for e in self.event_log:
+            if e.kind == "trade":
+                counts[e.bot_id] = counts.get(e.bot_id, 0) + 1
+        return counts
+
     def all_graves(self):
         return sorted((d for d, _, _ in self.deaths), key=lambda d: d.bot_id)
 

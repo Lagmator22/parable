@@ -351,3 +351,15 @@ def test_a_stopped_bot_leaves_the_running_list_at_once(client):
     c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
     lau.b.arkiv.records[0].status = "alive"  # as if Arkiv had not caught up with the death yet
     assert [b["bot_id"] for b in c.get("/api/bots", params={"status": "alive"}).json()] == []
+
+
+def test_graves_carry_trade_counts_and_arkiv_links(client, monkeypatch):
+    c, world, lau = client
+    bot = launch(c, world)
+    from parable.models import BotEvent
+    for _ in range(3):
+        lau.b.arkiv.put_event(BotEvent(bot_id=bot["bot_id"], kind="trade", at=int(time.time()), data={}))
+    c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
+    monkeypatch.setattr(api, "offline", lambda: False)
+    g = c.get("/api/graveyard/all").json()[0]
+    assert g["trades"] >= 3 and g["arkiv_url"].startswith("https://rabdi.explorer.arkiv.network/entity/0x")

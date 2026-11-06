@@ -24,17 +24,18 @@ export function Register({ report, recordError }: Props) {
 
   return <Section id="register" label="03 Register">
     <h2>The graveyard</h2>
-    <p className="lead">Every bot that ever stopped on this vault, and how. Nobody can remove a row: the vault writes them, not the bots. {report && (report.vault_count_matches
+    <p className="lead">Every bot that ever stopped on this vault, and how. Nobody can remove a row: the vault writes them, not the bots, and each one links to its read-only record on Arkiv. {report && (report.vault_count_matches
       ? `The vault counts ${report.launched} bots and so does this list, so none are missing.`
       : 'This list and the vault’s count differ right now; it usually catches up within a minute.')}</p>
     {problem && <div className="box empty">{problem}</div>}
     <div className="box rows register">
-      <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Lived</span><span>Return</span><span>How it ended</span><span/></div>
+      <div className="row head"><span>No.</span><span>Name</span><span>Brain</span><span>Trades</span><span>Lived</span><span>Return</span><span>How it ended</span><span>Check it</span></div>
       {rows.length === 0 ? <div className="empty">{problem ? 'Shows up once Arkiv answers.' : 'No bot has died yet.'}</div>
         : rows.map(g => <div className={`row ${g.cause === 'loss_limit' ? 'refused' : ''}`} key={g.bot_id}>
-          <span>{g.bot_id}</span><span className="struck">{g.ens_name}</span><span>{brainName(g.brain)}</span>
+          <span>{g.bot_id}</span><span className="struck">{g.ens_name}</span><span>{brainName(g.brain)}</span><span>{g.trades ?? '—'}</span>
           <span>{lived(g.lifetime_s)}</span><span className={trend(g.pnl_bps)}>{pct(g.pnl_bps)}</span>
-          <span>{causeName(g.cause)}</span><OutLink href={g.tx_url}>tx</OutLink>
+          <span>{causeName(g.cause)}</span>
+          <span className="links"><OutLink href={g.arkiv_url}>Arkiv</OutLink><OutLink href={g.tx_url}>tx</OutLink></span>
         </div>)}
     </div>
     {report && <div className="legend"><span>Launched {report.launched}</span><span>Running {report.alive}</span><span>Dead {report.dead}</span>

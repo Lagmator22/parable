@@ -191,6 +191,17 @@ class ArkivStore:
         rows = self._query(EVENT, bot_id=_n("u256", bot_id))
         return sorted((BotEvent.model_validate_json(r["body"]) for r in rows), key=lambda e: e.at, reverse=True)
 
+    def death_keys(self) -> dict[int, str]:
+        """bot_id -> the Arkiv key of its grave, so the page can link each grave to the Arkiv explorer."""
+        return {int(r["attributes"]["bot_id"]): r["key"] for r in self._query(DEATH)}
+
+    def trade_counts(self) -> dict[int, int]:
+        """bot_id -> how many trades it made, from ONE query over every trade event."""
+        counts: dict[int, int] = defaultdict(int)
+        for r in self._query(EVENT, kind=_s("trade")):
+            counts[int(r["attributes"]["bot_id"])] += 1
+        return dict(counts)
+
     def report_by_brain(self) -> dict[str, dict]:
         """Report-card numbers for every brain from just TWO queries (all bots, all deaths), grouped here."""
         bots = [BotRecord.model_validate_json(r["body"]) for r in self._query(BOT)]
@@ -289,3 +300,11 @@ def report_by_brain() -> dict[str, dict]:
 def all_graves() -> list[DeathRecord]:
     """Every grave this vault ever produced, any creator (the 'All graves on Arkiv' view)."""
     return sorted(default_store()._deaths(), key=lambda d: d.bot_id)
+
+
+def death_keys() -> dict[int, str]:
+    return default_store().death_keys()
+
+
+def trade_counts() -> dict[int, int]:
+    return default_store().trade_counts()

@@ -202,13 +202,21 @@ def list_bots(creator: str | None = None, status: str | None = None):
 
 @app.get("/api/graveyard/{creator_id}")
 def graveyard(creator_id: str):
+    """Graves, newest data from Arkiv. Each carries its trade count and a link to its own Arkiv entity page."""
     lau = get_launcher()
     c = None if creator_id == "all" else creator_id
     bots = {b.bot_id: b for b in lau.b.arkiv.bots(c, None)}
     deaths = lau.b.arkiv.all_graves() if c is None else lau.b.arkiv.graveyard(c)
+    try:
+        keys, trades = lau.b.arkiv.death_keys(), lau.b.arkiv.trade_counts()
+    except Exception:
+        keys, trades = {}, {}
+    explorer = "https://rabdi.explorer.arkiv.network/entity/"
     return [{**d.model_dump(), "ens_name": bots[d.bot_id].ens_name if d.bot_id in bots else f"bot #{d.bot_id}",
              "brain": bots[d.bot_id].rules.brain if d.bot_id in bots else "unknown",
              "code_hash": code_fingerprint(bots[d.bot_id].rules) if d.bot_id in bots else "",
+             "trades": trades.get(d.bot_id, 0),
+             "arkiv_url": explorer + keys[d.bot_id] if d.bot_id in keys and not offline() else None,
              "tx_url": tx_url(d.tx_hash)}
             for d in deaths]
 
