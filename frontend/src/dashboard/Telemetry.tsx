@@ -51,7 +51,8 @@ export function Telemetry({ open, onClose, info, bots, botEvents, series, swarm,
   const lines = (series?.bots || []).filter(b => b.points.length > 1).slice(-6).map((b, i) => ({
     name: b.ens_name.split('.')[0], color: PALETTE[i % PALETTE.length], dashed: b.swarm, points: b.points.map(p => [p[0], p[2]] as [number, number]) }));
   const priceRows = series?.prices || [];
-  const arkivQuery = `curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network -H "content-type: application/json" --data '{"jsonrpc":"2.0","id":1,"method":"arkiv_query","params":["arkiv.schema = str(\\u0027parable.death\\u0027) AND $owner = addr(${info?.arkiv_writer || '0x…'})",{"select":{"key":true,"attributes":true}}]}'`;
+  // Shell-safe: double quotes outside, single quotes inside for Arkiv's str('…') (it does not decode \u0027).
+  const arkivQuery = `curl -s https://rpc.rabdi.db-chain.testnet.arkiv.network -H "content-type: application/json" -d "{\\"jsonrpc\\":\\"2.0\\",\\"id\\":1,\\"method\\":\\"arkiv_query\\",\\"params\\":[\\"arkiv.schema = str('parable.death') AND \\$owner = addr(${info?.arkiv_writer || '0x…'})\\",{\\"select\\":{\\"key\\":true,\\"attributes\\":true}}]}"`;
   const castCall = `cast call ${info?.vault_address || '0x…'} "equityUsd(uint256)(uint256)" ${bots[0]?.bot_id ?? 1} --rpc-url https://ethereum-sepolia-rpc.publicnode.com`;
 
   return <>
