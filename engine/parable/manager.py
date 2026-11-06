@@ -80,8 +80,7 @@ class SwarmManager:
         pid, claim = "s-" + secrets.token_hex(12), secrets.token_urlsafe(24)
         self.pending[pid] = (plan, claim)
         self.launcher.b.world.register_pending(pid)
-        self.phase = "waiting"
-        return pid, claim
+        return pid, claim  # the page waits for the approval; the swarm's phase only changes once it starts
 
     def confirm(self, pid: str, claim: str) -> dict:
         """Poll after World approval. The first approved call starts launching the workers in the background.

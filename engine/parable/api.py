@@ -180,9 +180,14 @@ def list_bots(creator: str | None = None, status: str | None = None):
     # Include bots just born on-chain whose background Arkiv write is still in flight.
     for b in list(lau.live.values()):
         st = "dead" if b.dead else "alive"
-        if b.record.bot_id not in records and (not creator or b.record.creator_id.lower() == creator.lower()):
-            if not status or status == st:
-                records[b.record.bot_id] = b.record.model_copy(update={"status": st})
+        if b.record.bot_id in records:
+            # Arkiv takes a few seconds to record a death; this server knows at once, so it wins.
+            if st == "dead" and status == "alive":
+                records.pop(b.record.bot_id)
+            elif st == "dead":
+                records[b.record.bot_id] = records[b.record.bot_id].model_copy(update={"status": "dead"})
+        elif (not creator or b.record.creator_id.lower() == creator.lower()) and (not status or status == st):
+            records[b.record.bot_id] = b.record.model_copy(update={"status": st})
     out = []
     for rec in records.values():
         try:
@@ -241,13 +246,34 @@ def end_bot(bot_id: int, action: str, token: str = Header("", alias="x-owner-tok
     return {"ok": True, "tx_hash": tx, "tx_url": tx_url(tx)}
 
 
-def blocked(attack: str, fn, *args, **kwargs) -> dict:
-    """Run an attack. The vault is supposed to reject it, so a revert means the defence worked."""
+PUBLIC_RPC = "https://ethereum-sepolia-rpc.publicnode.com"
+
+
+def blocked(attack: str, check: str, fn, *args) -> dict:
+    """Ask the vault to dry-run an attack (eth_call: no fee, nothing changes). A refusal means the defence
+    worked, and the answer is the vault's own error name. `check` is the same call as a `cast` command,
+    so anyone can ask the real contract themselves and see the same refusal."""
     try:
-        tx = fn(*args, **kwargs)
+        fn(*args)
     except Exception as err:
-        return {"attack": attack, "blocked": True, "reason": get_launcher().b.vault.decode_revert(err)}
-    return {"attack": attack, "blocked": False, "reason": "NOT BLOCKED (this should never happen)", "tx_hash": tx}
+        reason = get_launcher().b.vault.decode_revert(err)
+        return {"attack": attack, "blocked": True, "reason": reason, "check": check, "code": error_code(reason)}
+    return {"attack": attack, "blocked": False, "reason": "NOT BLOCKED (this should never happen)", "check": check}
+
+
+def error_code(name: str) -> str:
+    """The 4-byte id `cast call` prints for a vault error (e.g. NotBot -> 0xa03b20af), so people can match them."""
+    try:
+        from parable.vault import _error_selectors
+
+        return next((sel for sel, n in _error_selectors().items() if n == name), "")
+    except Exception:
+        return ""
+
+
+def cast(signature: str, args: list, sender: str) -> str:
+    vault_address = get_settings().vault_address or "<vault>"
+    return f'cast call {vault_address} "{signature}" {" ".join(str(a) for a in args)} --from {sender} --rpc-url {PUBLIC_RPC}'
 
 
 @app.post("/api/cheat/unregistered-trade")
@@ -255,8 +281,9 @@ def cheat_unregistered():
     """A random wallet that was never registered tries to trade with a real bot's money."""
     lau = get_launcher()
     bot_id = next(iter(lau.live), 1)
-    stranger = Account.create().key.hex()
-    return blocked("unregistered wallet tries to trade", lau.b.vault.trade, "0x" + stranger.removeprefix("0x"), bot_id, True, 1_000_000)
+    stranger = Account.create().address
+    check = cast("trade(uint256,bool,uint256)", [bot_id, "true", 1_000_000], stranger)
+    return blocked("unregistered wallet tries to trade", check, lau.b.vault.simulate_trade, stranger, bot_id, True, 1_000_000)
 
 
 @app.post("/api/cheat/over-limit/{bot_id}")
@@ -267,7 +294,8 @@ def cheat_over_limit(bot_id: int):
     if bot is None:
         raise HTTPException(404, "unknown bot")
     big = bot.record.rules.max_trade_usd * 10
-    return blocked("bot trades 10x its limit", lau.b.vault.trade, bot.key, bot_id, True, big)
+    check = cast("trade(uint256,bool,uint256)", [bot_id, "true", big], bot.record.bot_address)
+    return blocked("bot trades 10x its limit", check, lau.b.vault.simulate_trade, bot.record.bot_address, bot_id, True, big)
 
 
 @app.post("/api/cheat/second-identity")
@@ -279,10 +307,10 @@ def cheat_second_identity():
         raise HTTPException(409, "launch a bot first")
     old = known[0]
     other_wallet, bot = Account.create().address, Account.create().address
-    return blocked("same person, new wallet", lau.b.vault.register_bot,
-                   bot_address=bot, creator_id=old.creator_id, creator_wallet=other_wallet,
-                   badge_node=to_bytes32("cheat"), expires_at=old.born_at + 86400, start_cash_usd=1_000_000,
-                   max_trade_usd=1_000_000, max_loss_bps=1000, strategy_id=to_bytes32("cheat"))
+    args = [bot, old.creator_id, other_wallet, to_bytes32("cheat"), old.born_at + 86400, 1_000_000, 1_000_000, 1000, to_bytes32("cheat")]
+    operator = lau.b.vault.operator_address()  # only the operator may register, so the dry run comes from it
+    check = cast("registerBot(address,bytes32,address,bytes32,uint64,uint256,uint256,uint16,bytes32)", args, operator)
+    return blocked("same person, new wallet", check, lau.b.vault.simulate_register, operator, *args)
 
 
 @app.get("/api/erc8004")

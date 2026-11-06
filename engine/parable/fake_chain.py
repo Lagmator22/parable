@@ -96,6 +96,22 @@ class FakeVault:
             self._die(bot_id, 3)
         return fake_tx()
 
+    def simulate_trade(self, sender, bot_id, buy, amount_usd):
+        """Dry run like eth_call: same checks as trade, nothing changes."""
+        b = self.bots.get(bot_id)
+        if b is None or sender.lower() != b["bot"].lower():
+            raise FakeRevert("NotBot")
+        if amount_usd > b["max_trade"]:
+            raise FakeRevert("OverTradeLimit")
+
+    def simulate_register(self, sender, bot_address, creator_id, creator_wallet, *rest):
+        for b in self.bots.values():
+            if (b["creator_id"] == creator_id) != (b["creator_wallet"] == creator_wallet):
+                raise FakeRevert("CreatorIdentityMismatch")
+
+    def operator_address(self):
+        return "0x" + "0" * 39 + "1"
+
     def _over_limit(self, bot_id: int) -> bool:
         b = self.bots[bot_id]
         return (b["hwm"] - self.equity(bot_id)) * 10000 // b["hwm"] >= b["max_loss"]

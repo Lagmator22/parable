@@ -66,7 +66,20 @@ def test_out_of_gas_money_has_a_readable_name():
     assert V.decode_revert(ValueError({"code": -32000, "message": "insufficient funds for gas * price + value"})) == "BotOutOfGas"
 
 
-def test_bot_top_up_has_gas_headroom():
+def test_bot_top_up_asks_the_network_for_the_real_gas_cost(monkeypatch):
+    """Sending ETH to a brand-new wallet costs ~207k gas on today's Sepolia; a fixed 21000 made every top-up fail."""
+    from types import SimpleNamespace
     from parable import vault as V
 
-    assert V.FUND_GAS_LIMIT > 21000  # 21000 exactly ran out of gas on Sepolia for brand-new bot wallets
+    seen = {}
+    fake_w3 = SimpleNamespace(eth=SimpleNamespace(estimate_gas=lambda tx: 207_391))
+    monkeypatch.setattr(V, "_w3", lambda: fake_w3)
+    monkeypatch.setattr(V, "_operator_key", lambda: "0x" + "11" * 32)
+
+    def fake_send(w3, key, build, timeout):
+        seen.update(build({"nonce": 0}))
+        return {"status": 1, "transactionHash": bytes(32)}
+    monkeypatch.setattr(V.tx_sender, "send", fake_send)
+    V.fund_gas("0x" + "22" * 20)
+    assert seen["gas"] == int(207_391 * 1.2) and seen["value"] == V.BOT_GAS_WEI
+    assert V.FUND_GAS_FALLBACK > 207_391  # used only if the estimate itself fails

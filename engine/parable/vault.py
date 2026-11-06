@@ -7,6 +7,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
+from eth_account import Account
 from web3 import Web3
 
 from parable import tx_sender
@@ -87,18 +88,45 @@ def expire(bot_id: int) -> str:
     return _tx_hex(_send(_vault().functions.expire(bot_id), _operator_key()))
 
 
-FUND_GAS_LIMIT = 100_000
+FUND_GAS_FALLBACK = 300_000
 BOT_GAS_WEI = 10**15  # 0.001 test ETH: enough gas for a bot's trades on Sepolia (gas there is very cheap)
 
 
 def fund_gas(bot_address: str, wei: int = BOT_GAS_WEI) -> str:
     """Send a little Sepolia ETH so the bot's own key can pay gas for its trades."""
     to = Web3.to_checksum_address(bot_address)
-    # A plain transfer used to cost exactly 21000 gas, but on today's Sepolia sending ETH to a BRAND-NEW wallet
-    # ran out of gas at 21000 (every bot top-up failed, so bots could never pay for a trade). Give it headroom:
-    # unused gas is not charged.
-    build = lambda fields: {**fields, "to": to, "value": wei, "gas": FUND_GAS_LIMIT}
-    return _tx_hex(tx_sender.send(_w3(), _operator_key(), build, timeout=RECEIPT_TIMEOUT_S))
+    # Sending ETH to a BRAND-NEW wallet no longer costs 21000 gas on Sepolia: creating the account now costs
+    # about 207,000. A fixed limit made every top-up fail (bots then could never pay for a trade), so we ask
+    # the network for the real cost and add 20% headroom. Unused gas is not charged.
+    try:
+        gas = int(_w3().eth.estimate_gas({"from": Account.from_key(_operator_key()).address, "to": to, "value": wei}) * 1.2)
+    except Exception:
+        gas = FUND_GAS_FALLBACK
+    build = lambda fields: {**fields, "to": to, "value": wei, "gas": gas}
+    receipt = tx_sender.send(_w3(), _operator_key(), build, timeout=RECEIPT_TIMEOUT_S)
+    if receipt["status"] != 1:
+        raise RuntimeError(f"gas top-up {_tx_hex(receipt)} failed on-chain")
+    return _tx_hex(receipt)
+
+
+# ---------------------------------------------------------------- dry runs (for "try to cheat")
+# eth_call asks the real contract to run a call WITHOUT sending a transaction: no fee, nothing changes,
+# and if the vault's rules refuse, we get the vault's own error name. Anyone can repeat it with `cast call`.
+
+def simulate_trade(sender: str, bot_id: int, buy: bool, amount_usd: int) -> None:
+    _vault().functions.trade(bot_id, buy, amount_usd).call({"from": Web3.to_checksum_address(sender)})
+
+
+def simulate_register(sender: str, bot_address: str, creator_id: str, creator_wallet: str, badge_node: str,
+                      expires_at: int, start_cash_usd: int, max_trade_usd: int, max_loss_bps: int, strategy_id: str) -> None:
+    _vault().functions.registerBot(
+        Web3.to_checksum_address(bot_address), to_bytes32(creator_id), Web3.to_checksum_address(creator_wallet),
+        to_bytes32(badge_node), expires_at, start_cash_usd, max_trade_usd, max_loss_bps, to_bytes32(strategy_id),
+    ).call({"from": Web3.to_checksum_address(sender)})
+
+
+def operator_address() -> str:
+    return Account.from_key(_operator_key()).address
 
 
 # ---------------------------------------------------------------- vault reads

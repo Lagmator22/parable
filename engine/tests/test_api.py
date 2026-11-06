@@ -332,3 +332,22 @@ def test_second_approved_swarm_cannot_replace_a_running_one(client, monkeypatch)
         mgr.confirm(second, claim2)  # void: a swarm already started
     assert mgr.claim == claim1
     mgr.stop_event.set()
+
+
+def test_cheat_answers_come_from_vault_dry_runs_with_a_cast_command(client):
+    c, world, _ = client
+    bot = launch(c, world)
+    r = c.post("/api/cheat/unregistered-trade").json()
+    assert r["blocked"] and r["reason"] == "NotBot" and r["check"].startswith("cast call ")
+    big = c.post(f"/api/cheat/over-limit/{bot['bot_id']}").json()
+    assert big["reason"] == "OverTradeLimit" and "trade(uint256,bool,uint256)" in big["check"]
+    twin = c.post("/api/cheat/second-identity").json()
+    assert twin["reason"] == "CreatorIdentityMismatch" and "registerBot(" in twin["check"]
+
+
+def test_a_stopped_bot_leaves_the_running_list_at_once(client):
+    c, world, lau = client
+    bot = launch(c, world)
+    c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
+    lau.b.arkiv.records[0].status = "alive"  # as if Arkiv had not caught up with the death yet
+    assert [b["bot_id"] for b in c.get("/api/bots", params={"status": "alive"}).json()] == []
