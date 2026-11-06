@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from eth_account import Account
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -96,7 +96,7 @@ def launch(req: LaunchRequest):
 
 
 @app.post("/api/launch/{pending_id}/confirm")
-def confirm(pending_id: str, claim: str):
+def confirm(pending_id: str, claim: str = Header("", alias="x-claim")):
     try:
         bot = get_launcher().confirm_launch(pending_id, claim)
     except ApprovalPending as err:
@@ -136,7 +136,7 @@ def report(creator: str | None = None, strategy: str | None = None):
 
 
 @app.post("/api/bots/{bot_id}/{action}")
-def end_bot(bot_id: int, action: str, token: str = ""):
+def end_bot(bot_id: int, action: str, token: str = Header("", alias="x-owner-token")):
     lau = get_launcher()
     if action == "kill":  # creator only: needs the claim code their browser kept from launch
         tx = vault_call(lau.kill, bot_id, token)

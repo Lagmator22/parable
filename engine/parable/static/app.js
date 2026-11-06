@@ -6,8 +6,9 @@ const cls = (bps) => (bps >= 0 ? "good" : "bad");
 const link = (url, text) => (url ? `<a href="${url}" target="_blank" rel="noopener">${text}</a>` : "");
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-async function api(path, method = "GET") {
-  const res = await fetch(path, { method });
+// Secret codes travel in headers (never in the web address, which can end up in logs).
+async function api(path, method = "GET", headers = {}) {
+  const res = await fetch(path, { method, headers });
   const body = await res.json().catch(() => ({}));
   return { ok: res.ok, status: res.status, body };
 }
@@ -58,8 +59,8 @@ function ownerToken(id) {
 }
 
 async function act(id, action) {
-  const token = action === "kill" ? `?token=${encodeURIComponent(ownerToken(id))}` : "";
-  const r = await api(`/api/bots/${id}/${action}${token}`, "POST");
+  const headers = action === "kill" ? { "x-owner-token": ownerToken(id) } : {};
+  const r = await api(`/api/bots/${id}/${action}`, "POST", headers);
   alert(r.ok ? `${action} done. tx: ${r.body.tx_hash}` : `Blocked by the vault: ${r.body.detail}`);
   refresh();
 }
@@ -73,7 +74,7 @@ async function launch() {
   window.open(approve_url, "_blank");  // the World ID approval page
   $("launch-msg").textContent = "Waiting for World ID approval in the new tab...";
   const timer = setInterval(async () => {
-    const r = await api(`/api/launch/${pending_id}/confirm?claim=${encodeURIComponent(claim)}`, "POST");
+    const r = await api(`/api/launch/${pending_id}/confirm`, "POST", { "x-claim": claim });
     if (r.status === 409) return;  // still waiting
     clearInterval(timer);
     if (r.ok) {

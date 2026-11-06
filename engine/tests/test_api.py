@@ -27,10 +27,10 @@ def client():
 def launch(c, world):
     body = c.post("/api/launch", json={"strategy": "momentum"}).json()
     pid, claim = body["pending_id"], body["claim"]
-    assert c.post(f"/api/launch/{pid}/confirm", params={"claim": "wrong"}).status_code == 404  # not the requester
-    assert c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).status_code == 409  # not approved yet
+    assert c.post(f"/api/launch/{pid}/confirm", headers={"x-claim": "wrong"}).status_code == 404  # not the requester
+    assert c.post(f"/api/launch/{pid}/confirm", headers={"x-claim": claim}).status_code == 409  # not approved yet
     world.decide(pid, True)
-    out = c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).json()
+    out = c.post(f"/api/launch/{pid}/confirm", headers={"x-claim": claim}).json()
     return {**out["bot"], "owner_token": out["owner_token"]}
 
 
@@ -39,8 +39,8 @@ def test_happy_path(client):
     bot = launch(c, world)
     assert c.get("/api/bots", params={"creator": bot["creator_id"]}).json()[0]["bot_id"] == bot["bot_id"]
     assert c.post(f"/api/bots/{bot['bot_id']}/check").status_code == 409  # not over its limit
-    assert c.post(f"/api/bots/{bot['bot_id']}/kill", params={"token": "stranger"}).status_code == 404  # not the creator
-    assert c.post(f"/api/bots/{bot['bot_id']}/kill", params={"token": bot["owner_token"]}).json()["ok"]
+    assert c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": "stranger"}).status_code == 404  # not the creator
+    assert c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]}).json()["ok"]
     grave = c.get(f"/api/graveyard/{bot['creator_id']}").json()
     assert grave[0]["cause"] == "killed" and grave[0]["ens_name"] == bot["ens_name"]
     report = c.get("/api/report", params={"creator": bot["creator_id"]}).json()
@@ -52,7 +52,7 @@ def test_denied_launch(client):
     body = c.post("/api/launch", json={}).json()
     pid, claim = body["pending_id"], body["claim"]
     world.decide(pid, False)
-    assert c.post(f"/api/launch/{pid}/confirm", params={"claim": claim}).status_code == 403
+    assert c.post(f"/api/launch/{pid}/confirm", headers={"x-claim": claim}).status_code == 403
     assert c.get("/api/bots").json() == []
 
 
