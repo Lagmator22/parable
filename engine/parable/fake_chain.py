@@ -161,6 +161,9 @@ class FakeArkiv:
     def graveyard(self, creator_id):
         return [d for d, cid, _ in self.deaths if cid == creator_id]
 
+    def _deaths(self):
+        return [d for d, _, _ in self.deaths]
+
     def bots(self, creator_id=None, status=None):
         return [r for r in self.records if creator_id in (None, r.creator_id) and status in (None, r.status)]
 

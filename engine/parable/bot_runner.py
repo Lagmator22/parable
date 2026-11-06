@@ -3,6 +3,7 @@ buy/sell/hold from the price history; if an AI brain is unavailable or answers b
 The vault (not this file) enforces the real limits; clamping here just avoids silly requests.
 """
 
+import hashlib
 import json
 import re
 import time
@@ -51,6 +52,12 @@ class AiAnswer(BaseModel):
 def eth_value_usd(state: dict) -> int:
     """ETH wei (18 decimals) * price (8 decimals) -> USD (6 decimals): divide by 1e20."""
     return state["eth_wei"] * state["price"] // 10**20
+
+
+def code_fingerprint(rules: BotRules) -> str:
+    """Short SHA-256 hash of a bot's brain + strategy rules, stored on its ENS badge so rebirths are linked."""
+    spec = f"{rules.brain}:{rules.strategy}:{PRESETS.get(rules.strategy, '')}:{rules.max_loss_bps}"
+    return "0x" + hashlib.sha256(spec.encode()).hexdigest()[:16]
 
 
 def clamp(decision: TradeDecision, state: dict) -> TradeDecision:

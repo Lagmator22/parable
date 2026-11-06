@@ -38,9 +38,11 @@ file and `engine/parable/api.py` disagree, tell the backend side (Claude Code) a
 { "offline": false, "explorer": "https://sepolia.etherscan.io/tx/",
   "vault_address": "0x5432...", "ens_parent": "parable.eth", "arkiv_writer": "0x4Bf4...",
   "arkiv_explorer": "https://rabdi.explorer.arkiv.network", "ens_app": "https://sepolia.app.ens.domains/",
-  "strategies": ["momentum", "dip_buyer", "yolo"] }
+  "strategies": ["momentum", "dip_buyer", "yolo"],
+  "default_creator": "0xa4b3...", "eth_price_usd": 2233.24 }
 ```
 `offline: true` means the engine runs a fake chain: show a clear **OFFLINE SIMULATION** banner.
+If `localStorage.creator` is empty on load, initialize `creator` to `info.default_creator` so visitors and judges immediately see the public bots, graveyard, and report card without an empty screen!
 
 ### `GET /api/brains` → `[{"brain": "rule", "available": true}, {"brain": "gemini:gemini-3.5-flash-lite", "available": true}, ...]`
 Only `available: true` brains may be picked in the launch form.
@@ -74,9 +76,9 @@ A real launch takes **30–90 s** after approval (6 blockchain transactions). Sh
   "strategy": "momentum", "status": "alive", "born_at": 1762412345, "born_tx": "0x...",
   "rules": {"strategy": "momentum", "brain": "rule", "start_cash_usd": 100000000, "max_trade_usd": 20000000,
             "max_loss_bps": 1000, "lease_seconds": 3600},
-  "equity_usd": 98500000, "pnl_bps": -150, "tx_url": "https://..." }
+  "code_hash": "0x8f3a1c902b4e7d11", "equity_usd": 98500000, "pnl_bps": -150, "tx_url": "https://..." }
 ```
-`equity_usd` / `pnl_bps` may be `null` (chain read failed). Time left = `born_at + rules.lease_seconds - now`.
+`equity_usd` / `pnl_bps` may be `null` (chain read failed). Time left = `born_at + rules.lease_seconds - now`. `code_hash` is the SHA-256 fingerprint of the bot's brain + strategy stored on its ENSv2 badge.
 
 ### `GET /api/bots/{bot_id}/events` → `[BotEvent]`, newest first
 ```json
@@ -119,9 +121,9 @@ A real launch takes **30–90 s** after approval (6 blockchain transactions). Sh
 ### World pages (served by the engine, not the frontend)
 `/world/start`, `/world/callback`, `/world/mock/decision` return plain HTML. Don't rebuild them.
 
-### Planned (not built yet; build the UI behind a feature check, hide if the route 404s)
-- `GET /api/manager` → the AI manager ("swarm") status: `{ "enabled": bool, "mind": "claude-opus-5-5", "bots": [bot_id], "decisions": [{at, action: "launch|kill|flag|keep", bot_id, reason}] }`
-- `POST /api/manager/start` `{ "bots": 4, "minutes": 20 }` → starts a manager run.
+### AI Swarm Manager (LIVE — Stretch Goal #2)
+- `GET /api/manager` → the AI manager ("swarm") status: `{ "enabled": true, "mind": "gemini:gemini-3.5-flash-lite", "bots": [bot_id], "decisions": [{at, action: "launch|kill|flag|keep", bot_id, reason}] }`
+- `POST /api/manager/start` `{ "bots": 3, "minutes": 15 }` → runs an AI Swarm Manager audit pass (and spawns worker bots in offline mode), returning the updated status + decisions.
 
 ## How the frontend is served
 - **Dev:** `cd ~/ethglobal/parable/frontend && npm run dev` (Vite on 5173) proxies `/api` and `/world` to

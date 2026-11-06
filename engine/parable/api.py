@@ -16,10 +16,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from parable import world_pass
+from parable.bot_runner import PRESETS, available_brains, code_fingerprint
 from parable.config import get_settings
 from parable.launcher import (ApprovalDenied, ApprovalPending, Launcher, LaunchError, LaunchFailed, real_backends,
                               to_bytes32)
-from parable.bot_runner import available_brains
+from parable.manager import SwarmManager
 from parable.models import BotRules
 
 STATIC = Path(__file__).parent / "static"
@@ -27,6 +28,7 @@ FRONTEND = Path(__file__).resolve().parents[2] / "frontend" / "dist"  # the new 
 EXPLORER_TX = "https://sepolia.etherscan.io/tx/"
 log = logging.getLogger("parable.api")
 _launcher: Launcher | None = None
+_manager: SwarmManager | None = None
 
 
 def offline() -> bool:
@@ -48,8 +50,16 @@ def get_launcher() -> Launcher:
 
 def set_launcher(launcher: Launcher | None) -> None:
     """Tests use this to plug in a launcher built from fakes."""
-    global _launcher
+    global _launcher, _manager
     _launcher = launcher
+    _manager = None
+
+
+def get_manager() -> SwarmManager:
+    global _manager
+    if _manager is None:
+        _manager = SwarmManager(get_launcher())
+    return _manager
 
 
 def tx_url(tx: str | None) -> str | None:
@@ -109,13 +119,23 @@ def arkiv_writer() -> str:
 @app.get("/api/info")
 def info():
     """Public facts the website shows as proof links. Addresses only, never keys."""
-    from parable.bot_runner import PRESETS
-
     s = get_settings()
+    lau = get_launcher()
+    default_creator = next((b.record.creator_id for b in reversed(list(lau.live.values()))), "")
+    if not default_creator:
+        try:
+            known = lau.b.arkiv.bots()
+            default_creator = known[-1].creator_id if known else ""
+        except Exception:
+            default_creator = ""
+    try:
+        eth_price_usd = round(lau.b.vault.price() / 1e8, 2)
+    except Exception:
+        eth_price_usd = None
     return {"offline": offline(), "explorer": EXPLORER_TX, "vault_address": s.vault_address,
             "ens_parent": s.ens_parent_name, "arkiv_writer": arkiv_writer(),
             "arkiv_explorer": "https://rabdi.explorer.arkiv.network", "ens_app": "https://sepolia.app.ens.domains/",
-            "strategies": list(PRESETS)}
+            "strategies": list(PRESETS), "default_creator": default_creator, "eth_price_usd": eth_price_usd}
 
 
 @app.get("/api/brains")
@@ -169,17 +189,22 @@ def list_bots(creator: str | None = None, status: str | None = None):
         except Exception:
             equity = None
         pnl = (equity - rec.rules.start_cash_usd) * 10000 // rec.rules.start_cash_usd if equity is not None else None
-        out.append({**rec.model_dump(), "equity_usd": equity, "pnl_bps": pnl, "tx_url": tx_url(rec.born_tx)})
+        out.append({**rec.model_dump(), "code_hash": code_fingerprint(rec.rules),
+                    "equity_usd": equity, "pnl_bps": pnl, "tx_url": tx_url(rec.born_tx)})
     return out
 
 
 @app.get("/api/graveyard/{creator_id}")
 def graveyard(creator_id: str):
     lau = get_launcher()
-    bots = {b.bot_id: b for b in lau.b.arkiv.bots(creator_id, None)}
+    c = None if creator_id == "all" else creator_id
+    bots = {b.bot_id: b for b in lau.b.arkiv.bots(c, None)}
+    deaths = lau.b.arkiv._deaths() if c is None else lau.b.arkiv.graveyard(c)
     return [{**d.model_dump(), "ens_name": bots[d.bot_id].ens_name if d.bot_id in bots else f"bot #{d.bot_id}",
-             "brain": bots[d.bot_id].rules.brain if d.bot_id in bots else "unknown", "tx_url": tx_url(d.tx_hash)}
-            for d in lau.b.arkiv.graveyard(creator_id)]
+             "brain": bots[d.bot_id].rules.brain if d.bot_id in bots else "unknown",
+             "code_hash": code_fingerprint(bots[d.bot_id].rules) if d.bot_id in bots else "",
+             "tx_url": tx_url(d.tx_hash)}
+            for d in deaths]
 
 
 @app.get("/api/report")
@@ -248,15 +273,30 @@ def cheat_over_limit(bot_id: int):
 def cheat_second_identity():
     """The same World identity tries to register a bot under a different creator wallet (fresh start)."""
     lau = get_launcher()
-    alive = [b for b in lau.live.values() if not b.dead]
-    if not alive:
+    known = [b.record for b in lau.live.values()] or lau.b.arkiv.bots()
+    if not known:
         raise HTTPException(409, "launch a bot first")
-    old = alive[0]
+    old = known[0]
     other_wallet, bot = Account.create().address, Account.create().address
     return blocked("same person, new wallet", lau.b.vault.register_bot,
-                   bot_address=bot, creator_id=old.record.creator_id, creator_wallet=other_wallet,
-                   badge_node=to_bytes32("cheat"), expires_at=old.expires_at, start_cash_usd=1_000_000,
+                   bot_address=bot, creator_id=old.creator_id, creator_wallet=other_wallet,
+                   badge_node=to_bytes32("cheat"), expires_at=old.born_at + 86400, start_cash_usd=1_000_000,
                    max_trade_usd=1_000_000, max_loss_bps=1000, strategy_id=to_bytes32("cheat"))
+
+
+class ManagerRequest(BaseModel):
+    bots: int = 3
+    minutes: int = 15
+
+
+@app.get("/api/manager")
+def manager_status():
+    return get_manager().status()
+
+
+@app.post("/api/manager/start")
+def manager_start(req: ManagerRequest = ManagerRequest()):
+    return get_manager().start(count=req.bots, minutes=req.minutes, spawn_offline=offline())
 
 
 @app.get("/")

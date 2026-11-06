@@ -60,15 +60,15 @@ It prints both addresses. Put them in `.env` as `ENS_BADGE_ORACLE` and `VAULT_AD
 ## Status text record: "bot may edit only its own `status`"
 Not done, deliberately. In the current `PermissionedResolver` a setter role is scoped by record **key**, not by name: granting a bot `SET_TEXT` on `status` would let it write `status` for every name on that resolver (the name is just a function argument). Per-name scoping needs one resolver per bot. That is feasible (deploy a proxy through the VerifiableFactory, pre-set records with the `calls` argument of `initialize`, then `grantSetterRoles(setText(name,"status",""), bot)` so only that key is writable), but it costs two more transactions per bot, so the shared resolver with operator-only writes is the default. `issue_badge` writes `status=alive`; the engine can update it via the operator.
 
-## Verified vs not
-Verified:
-- Python module against mocks (`engine/tests/test_ens_badge.py`, includes `setup_parent`); `uv run pytest` is green.
-- Live read-only on Sepolia (2026-11-06): the four ENSv2 addresses have code, and `registry_for`, `getState`, `is_valid` decode correctly against the real `.eth` registry.
-- Oracle and vault tests compile with solc 0.8.24 (`EnsV2BadgeOracle.t.sol` uses fake registry and resolver; `Deploy.s.sol` compiles). Earlier phase: oracle checked against mock contracts and `eth_call` simulation of `VerifiableFactory.deployProxy`.
-
-Not verified:
-- The Foundry tests have not been RUN: Foundry (`forge`) is not installed on this machine. Install with `foundryup`, then `cd contracts && forge install foundry-rs/forge-std --no-git && forge test -vv`.
-- Anything needing a funded operator and a registered parent name: a real `register` with an empty role bitmap, `setSubregistry` on a real parent, the resolver `multicall`, `unregister` by the oracle, `ens_spike.py` end to end, and `Deploy.s.sol` on Sepolia. No `.env` exists yet, and `parable.eth` was unregistered on Sepolia when checked.
+## Verified live on Sepolia (2026-11-06)
+- **39 Foundry tests pass** (`contracts/test/EnsV2BadgeOracle.t.sol` — 15 tests; `contracts/test/ParableVault.t.sol` — 24 tests) and **17 Python unit tests pass** (`engine/tests/test_ens_badge.py`).
+- **Live on-chain deployment & end-to-end verification on Sepolia (`chainId 11155111`):**
+  - Parent name: `parable.eth` (owned by operator `0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570`)
+  - Badge subregistry (`UserRegistry` proxy): [`0xf749a1584e70A2285E608DF192A485EB87186B4b`](https://sepolia.etherscan.io/address/0xf749a1584e70A2285E608DF192A485EB87186B4b)
+  - Badge resolver (`PermissionedResolver` proxy): [`0xaba5B8A13Ac0c62AaF4d6FF2527BF8690DceAF80`](https://sepolia.etherscan.io/address/0xaba5B8A13Ac0c62AaF4d6FF2527BF8690DceAF80)
+  - `EnsV2BadgeOracle` (verified on Sourcify): [`0x087077ceBb69d8617b41735aAe24232697Af4EcA`](https://repo.sourcify.dev/11155111/0x087077ceBb69d8617b41735aAe24232697Af4EcA)
+  - `ParableVault` (verified on Sourcify): [`0x5432bE5713f358225d648eAb2EC9f699B25Ef317`](https://repo.sourcify.dev/11155111/0x5432bE5713f358225d648eAb2EC9f699B25Ef317)
+  - Proven live lifecycle on Sepolia: [register subname badge](https://sepolia.etherscan.io/tx/0x2fafde65460e158cb2d085a18ab72fbf8d65ea98f18482d3b20ab4330554e559) → [write resolver records (`addr`, `strategy`, `brain`, `max_loss_bps`, `code_hash`)](https://sepolia.etherscan.io/tx/0x6bbc664fea34da2dae01cbfc58d916b6c1c0269268808cf19135ecae6821a919) → [bind to `EnsV2BadgeOracle`](https://sepolia.etherscan.io/tx/0x443c1073dc13a73812485b314f176dd7cef52117ac08bc08d2911965c15de388) → [revoke/burn via `unregister`](https://sepolia.etherscan.io/tx/0x02204e998f0735ae4e2bcbde6eb78d1d48fd840f9731b4042f5df3f96ad8609b), plus 4 real bot launches (`bot-1-bcc2.parable.eth`, `bot-2-3da0.parable.eth`, `bot-3-fad9.parable.eth`).
 
 ## Fallback if ENSv2 Sepolia subnames prove impossible today
 1. Same Python/Solidity interface, but **skip the registry**: keep the badge record inside the oracle (`bind` stores expiry and bot, `revoke` sets a flag). Then ENS is only a text-record decoration on the parent name, as in FINAL_PLAN's fallback. `isValid` would check the stored expiry instead of `getState`.

@@ -185,7 +185,7 @@
 | 8 | Each bot needs 0.003 test ETH for fees, so the operator wallet must hold enough | 🟡 Small | Keep ~0.1 Sepolia ETH in the operator wallet |
 | 9 | Sepolia's Chainlink price updates about once an hour | ✅ Fixed | MAX_PRICE_AGE = 7200 s; when the oracle is flat between hourly updates, the bot brain gets small signal ticks so `momentum` and `dip_buyer` still trade (the vault always settles at the real Chainlink price) |
 | 10 | "Unregistered bot" demo shows `NotBot`; clearer to also show `NotRegistered` | 🟢 Polish | Add a second cheat button |
-| 11 | MCP (Claude Code / Codex access) and the Opus manager are not started | ⚪ Stretch | Phase 4, only after the core runs for real |
+| 11 | ~~MCP (Claude Code / Codex access) and the Opus manager are not started~~ | ✅ Done | `mcp_server.py` (7 tools), `manager.py` (`/api/manager`), and `code_hash` fingerprint on ENSv2 badges all built and tested |
 
 ## 9. Bot brains
 Each bot is launched with one "brain" (the thing that decides buy, sell or hold). The report card can then compare brains fairly.
@@ -231,4 +231,4 @@ Each bot is launched with one "brain" (the thing that decides buy, sell or hold)
   Clean rows: every row carries the vault's address, so old test rows never show up
 ```
 
-*Status: 141 Python + 39 contract tests pass. First 4 real Sepolia bots born and in the Arkiv graveyard (`vault_count_matches: true`).*
+*Status: 143 Python + 39 contract tests pass (182 total). Core + Stretch #1 (MCP) + Stretch #2 (Swarm Manager) + Stretch #3 (Code Fingerprint) + all Arkiv/World/ENS docs complete.*

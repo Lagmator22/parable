@@ -1,14 +1,14 @@
 # Parable on Arkiv: schema
 
 Network: Arkiv **Rabdi** testnet (chain id 7794095, RPC `https://rpc.rabdi.db-chain.testnet.arkiv.network`, explorer https://rabdi.explorer.arkiv.network).
-Code: `arkiv-bridge/index.mjs` (official JS SDK `@arkiv-network/sdk` 1.0.1, signs and queries), `engine/parable/arkiv_store.py` (Python client of the bridge), `engine/tests/test_arkiv_store.py`, `spikes/arkiv_spike.py`.
-Status: reads verified live on Rabdi; writes not yet verified on chain (writer wallet unfunded at time of writing).
+Code: `arkiv-bridge/index.mjs` (official JS SDK `@arkiv-network/sdk` 1.0.1, signs and queries), `engine/parable/arkiv_store.py` (Python client of the bridge), `engine/parable/repair.py` (outbox + vault-to-Arkiv self-healing repair), `engine/tests/test_arkiv_store.py`, `spikes/arkiv_spike.py`.
+Status: **Verified live on Rabdi testnet (2026-11-06)** — real bot records, birth events, and graves written and queried back in `< 0.5s` using writer wallet [`0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570`](https://rabdi.explorer.arkiv.network/address/0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570) (sample Rabdi txs: [bot](https://rabdi.explorer.arkiv.network/tx/0x19865c864b2dce647f6c3041afdec6c178a3848cf9a0dfaf08f57f1f06a45fb3), [birth](https://rabdi.explorer.arkiv.network/tx/0x98b24330b21fb990bcee3a1d5dab8916cb9a16fe95cb1a132efed5adebe89615), [death](https://rabdi.explorer.arkiv.network/tx/0xc5714abb242c6d3eddc8a79272097f1febe88886dbe8fd7239dfdd6c8b150f15)).
 
 Parable is a public record of AI trading bots: who launched them, what they did, and how they died. Arkiv is the public, queryable copy; the Sepolia vault is the source of truth, and every Arkiv record carries the Sepolia transaction hash in `vault_tx`.
 
 ## Owner (writer wallet)
 
-All records are written by **one engine wallet** (`ARKIV_PRIVATE_KEY`). Its address is returned by the bridge `GET /health` and printed by `uv run python ../spikes/arkiv_spike.py` and listed in the README (`WRITER_WALLET: <filled at submit time>`).
+All records are written by **one engine wallet** (`ARKIV_PRIVATE_KEY`), public address `0x4Bf4Cf3Ac386A57DBf7C8b5eB93cE942d4504570`. Its address is returned by the bridge `GET /health` and `GET /api/info` (`arkiv_writer`) and listed in the README.
 Arkiv is a public database where anyone can write entities of any shape, so **every Parable query filters `$owner = addr(<writer>)`** next to the schema tag. A copycat writing fake `parable.death` rows is ignored by our app and by anyone who copies our query.
 Bots never write their own record: the engine mirrors vault events, so a bot cannot hide or edit its death.
 

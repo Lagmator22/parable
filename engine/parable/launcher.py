@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 from eth_account import Account
 
+from parable.bot_runner import code_fingerprint
 from parable.models import BotEvent, BotRecord, BotRules, DeathRecord
 from parable.repair import Outbox, repair
 
@@ -138,8 +139,10 @@ class Launcher:
         self.counter += 1
         label = f"bot-{self.counter}-{secrets.token_hex(2)}"
         v.fund_gas(wallet.address)  # the bot needs a little ETH to pay gas for its own trades
+        fp = code_fingerprint(rules)
         ens_name, node = self.b.ens.issue_badge(
-            label, wallet.address, expires_at, {"strategy": rules.strategy, "max_loss_bps": str(rules.max_loss_bps)}
+            label, wallet.address, expires_at,
+            {"strategy": rules.strategy, "brain": rules.brain, "max_loss_bps": str(rules.max_loss_bps), "code_hash": fp},
         )
         bot_id, tx = v.register_bot(
             bot_address=wallet.address, creator_id=creator_id,
@@ -154,7 +157,8 @@ class Launcher:
         self.live[bot_id] = bot
         self._start_runner(bot, rules)
         # From here the bot exists in the vault, so slow Arkiv writes run in the background and never hold up confirm.
-        birth = BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx, data={"ens_name": ens_name})
+        birth = BotEvent(bot_id=bot_id, kind="birth", at=now, tx_hash=tx,
+                         data={"ens_name": ens_name, "brain": rules.brain, "code_hash": fp})
         writer = threading.Thread(target=self._write_birth, args=(record, rules.lease_seconds, birth), daemon=True)
         writer.start()
         writer.join(timeout=0.05)  # finishes at once in fast tests; returns immediately if Arkiv is slow on-chain

@@ -185,3 +185,38 @@ def test_report_survives_vault_rpc_disconnect(client):
     lau.b.vault.counts = lambda _c: (_ for _ in ()).throw(ConnectionResetError("reset"))
     r = c.get("/api/report", params={"creator": bot["creator_id"]})
     assert r.status_code == 200 and r.json()["vault_count_matches"] is False
+
+
+def test_code_fingerprint_default_creator_and_all_graveyard(client):
+    c, world, _ = client
+    bot = launch(c, world)
+    listed = c.get("/api/bots").json()[0]
+    assert listed["code_hash"].startswith("0x") and len(listed["code_hash"]) == 18
+    info = c.get("/api/info").json()
+    assert info["default_creator"] == bot["creator_id"] and info["eth_price_usd"] == 3000.0
+    c.post(f"/api/bots/{bot['bot_id']}/kill", headers={"x-owner-token": bot["owner_token"]})
+    all_graves = c.get("/api/graveyard/all").json()
+    assert len(all_graves) == 1 and all_graves[0]["code_hash"] == listed["code_hash"]
+    # Second identity cheat still works even after all bots are dead in the graveyard!
+    assert c.post("/api/cheat/second-identity").json()["reason"] == "CreatorIdentityMismatch"
+
+
+def test_swarm_manager_and_mcp_tools(client):
+    from parable import mcp_server
+    from parable.models import BotEvent
+
+    c, world, lau = client
+    bot = launch(c, world)
+    # Record a rejected trade so the swarm manager flags the bot.
+    lau.b.arkiv.put_event(BotEvent(bot_id=bot["bot_id"], kind="rejected", at=int(time.time()),
+                                   data={"reason": "OverTradeLimit"}))
+    st = c.get("/api/manager").json()
+    assert st["enabled"] is True
+    ran = c.post("/api/manager/start", json={"bots": 2, "minutes": 10}).json()
+    actions = {d["action"] for d in ran["decisions"]}
+    assert "flag" in actions and "keep" in actions
+    # Verify MCP tools work against the same engine state.
+    assert mcp_server.list_bots()[0]["bot_id"] == bot["bot_id"]
+    assert mcp_server.report_card(creator_id=bot["creator_id"])["launched"] == 1
+    assert mcp_server.bot_events(bot["bot_id"])[0]["kind"] in ("birth", "rejected", "trade")
+    assert len(mcp_server.compare_brains()) >= 1
