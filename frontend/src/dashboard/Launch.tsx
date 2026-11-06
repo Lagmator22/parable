@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ScrambleButton } from '../components/ui/ScrambleButton';
+import { SelectMenu } from '../components/ui/SelectMenu';
 import { ApiError, brainName, post, saveCreator, saveOwner, type Bot, type Brain, type Info, type Rules } from './api';
 
 type Props = { info: Info | null; brains: Brain[]; onBorn: (creator: string) => void };
@@ -67,8 +68,8 @@ export function Launch({ info, brains, onBorn }: Props) {
     <div className="app-panel launch-panel">
       <form onSubmit={launch}>
         <div className="form-grid">
-          <label>Strategy<select value={strategy} onChange={event => setStrategy(event.target.value)}>{(info?.strategies || ['momentum']).map(value => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
-          <label>Brain<select value={brain} onChange={event => setBrain(event.target.value)}>{available.map(item => <option key={item.brain} value={item.brain}>{brainName(item.brain)}</option>)}</select></label>
+          <SelectMenu label="Strategy" value={strategy} onChange={setStrategy} options={(info?.strategies || ['momentum']).map(value => ({ value, label: value.replaceAll('_', ' ') }))}/>
+          <SelectMenu label="Brain" value={brain} onChange={setBrain} options={available.map(item => ({ value: item.brain, label: brainName(item.brain) }))}/>
           <label>Starting cash ($)<input type="number" min="1" step="0.01" value={cash} onChange={event => setCash(event.target.value)}/></label>
           <label>Max trade ($)<input type="number" min="0.01" step="0.01" value={trade} onChange={event => setTrade(event.target.value)}/></label>
           <label>Max loss (%)<input type="number" min="0.01" max="100" step="0.01" value={loss} onChange={event => setLoss(event.target.value)}/></label>

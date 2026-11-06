@@ -76,6 +76,27 @@
 .header-actions .menu-trigger{min-width:136px;min-height:64px;justify-content:center;padding:16px 24px;background:#294c40;color:#f7f2e8;border:2px solid #507d6b;border-radius:7px;font-size:20px;font-weight:800;transition:background .2s,border-color .2s,color .2s}
 .header-actions .menu-trigger:hover,.header-actions .menu-trigger:focus-visible{background:#3b6a57;color:#fff;border-color:#a8d8c5}
 @media(max-width:700px){.header-actions .menu-trigger{min-width:104px;min-height:52px;padding:12px 18px;font-size:18px}.header-actions{gap:12px}}
+
+/* The launch choices use a browser-independent menu with the same focus and border treatment. */
+.select-field{position:relative;display:flex;flex-direction:column;gap:9px;font-size:17px;font-weight:700;min-width:0}
+.select-trigger{width:100%;height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;border:2px solid var(--outline);border-radius:5px;background:var(--bg);color:var(--ink);padding:0 15px;font-size:18px;font-weight:650;cursor:pointer}
+.select-trigger span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.select-trigger svg{flex:none;transition:transform .2s}.select-trigger[aria-expanded=true] svg{transform:rotate(180deg)}
+.select-trigger:hover{border-color:var(--accent)}.select-trigger:focus-visible,.select-option:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.select-options{position:absolute;z-index:12;top:calc(100% + 6px);left:0;width:max(100%,min(360px,90vw));max-height:270px;overflow-y:auto;background:var(--panel);color:var(--ink);border:2px solid var(--outline);border-radius:6px;box-shadow:0 18px 42px #0003;padding:6px}
+.select-option{min-height:48px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-radius:4px;font-size:17px;font-weight:600;cursor:pointer;overflow-wrap:anywhere}
+.select-option:hover,.select-option.active{background:var(--button);color:var(--button-ink)}
+.select-option[aria-selected=true] svg{flex:none}
+
+/* The illustrated history responds to the pointer and each row leads to its real section. */
+.hero-visual{position:relative;isolation:isolate;overflow:hidden;--pointer-x:50%;--pointer-y:50%}
+.hero-visual::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;background:radial-gradient(310px circle at var(--pointer-x) var(--pointer-y),color-mix(in srgb,var(--accent) 16%,transparent),transparent 75%);opacity:0;transition:opacity .2s}
+.hero-visual:hover::before,.hero-visual:focus-within::before{opacity:1}
+.hero-visual>*{position:relative;z-index:1}
+.visual-line{border-radius:5px;transition:background .2s,padding-left .2s}
+.visual-line:hover,.visual-line:focus-visible{background:color-mix(in srgb,var(--accent) 10%,transparent);padding-left:12px}
+.visual-line>span{transition:transform .2s,background .2s}
+.visual-line:hover>span,.visual-line:focus-visible>span{transform:scale(1.08);background:var(--accent);color:var(--bg)}
+@media(prefers-reduced-motion:reduce){.visual-line,.visual-line>span,.hero-visual::before{transition:none}}
 @media(max-width:760px){.app-section{padding-top:68px;padding-bottom:68px}.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.section-number{width:50px;height:50px;font-size:20px}.timeline-row{grid-template-columns:1fr 1fr}.timeline-row span:last-child{grid-column:1/-1}.report-head{flex-direction:column}}
 @media(max-width:520px){.form-grid{grid-template-columns:1fr}.app-heading h2{font-size:48px}.section-number{display:none}.app-panel{padding:22px}.bot-top{flex-direction:column}.stat-row>div{min-width:calc(50% - 22px)}.menu-links .scramble{font-size:34px}}
 
