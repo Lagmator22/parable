@@ -14,13 +14,15 @@ type ArenaData = {
 };
 
 export function Arena() {
+  const [open, setOpen] = useState(false);
   const [data, setData] = useState<ArenaData | null>(null);
   const [busy, setBusy] = useState<string>('');
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!open || data) return;
     request<ArenaData>('/api/arena').then(setData).catch(err => setError(err instanceof Error ? err.message : 'Could not load arena'));
-  }, []);
+  }, [open, data]);
 
   async function runScenario(id: string) {
     setBusy(id); setError('');
@@ -29,65 +31,67 @@ export function Arena() {
     finally { setBusy(''); }
   }
 
-  return <section className="app-section" id="arena">
-    <div className="app-heading">
+  return <div className="app-panel extra-block" id="arena">
+    <div className="extra-head">
       <div>
-        <h2>Market Arena Benchmark</h2>
-        <p>Simulate AI brains head-to-head across crypto market crashes, rallies, and live Binance ETH/USDT feeds (modeled after nof1 Alpha Arena, Recall Network & FinAI Agent Market Arena).</p>
+        <span className="sim-badge">SIMULATION, not the real vault</span>
+        <h3>Market Arena Benchmark</h3>
+        <p>Head-to-head AI brain stress test across market crashes, rallies, and live Binance ETH/USDT feeds.</p>
       </div>
-      <span className="section-number">04</span>
+      <ScrambleButton label={open ? 'Hide simulation' : 'Open simulation'} onClick={() => setOpen(prev => !prev)} aria-expanded={open}/>
     </div>
-    {error && <div className="status-message" role="status">{error}</div>}
-    {data && <div className="app-panel">
-      <div className="card-actions" style={{ marginBottom: '1rem' }}>
-        {data.scenarios.map(s => (
-          <ScrambleButton
-            key={s.id}
-            className={data.scenario.id === s.id ? 'solid-action' : ''}
-            label={busy === s.id ? `Running ${s.title.split(' (')[0]}…` : s.title}
-            disabled={Boolean(busy)}
-            onClick={() => void runScenario(s.id)}
-          />
-        ))}
-      </div>
-      <p style={{ marginBottom: '0.75rem' }}><strong>{data.scenario.title}:</strong> {data.scenario.subtitle}</p>
-      <div className="stat-row" style={{ marginBottom: '1rem' }}>
-        <div><span>ETH Price Tape</span><strong>{data.scenario.prices_usd.map(p => `$${p.toLocaleString()}`).join(' → ')}</strong></div>
-        <div><span>Survived</span><strong>{data.summary.survived} / {data.summary.launched}</strong></div>
-        <div><span>Auto-killed by Vault</span><strong>{data.summary.killed_by_vault} 🪦</strong></div>
-        <div><span>Best / Worst Return</span><strong>{pct(data.summary.best_pnl_bps)} / {pct(data.summary.worst_pnl_bps)}</strong></div>
-      </div>
-      <div className="bot-grid">
-        {data.contenders.map(c => (
-          <article className="app-panel bot-card" key={c.bot_id}>
-            <div className="bot-top">
-              <div>
-                <h3>{c.label}</h3>
-                <p>{c.ens_name}</p>
-              </div>
-              <span className={c.status === 'alive' ? 'alive-badge' : 'dead-badge'}>
-                {c.status === 'alive' ? 'Survived ✓' : '🪦 Vault Killed (loss_limit)'}
-              </span>
-            </div>
-            <span className="code-pill">ENSv2 code: {c.code_hash.slice(0, 10)}</span>
-            <div className="stat-row">
-              <div><span>Final Equity</span><strong>{usd(c.final_equity_usd)}</strong></div>
-              <div><span>Return</span><strong>{pct(c.pnl_bps)}</strong></div>
-              <div><span>Trades / Blocked</span><strong>{c.trades} / {c.blocked}</strong></div>
-            </div>
-            <div className="timeline">
-              <h4>Round-by-round market replay</h4>
-              {c.steps.map((st, idx) => (
-                <div className="timeline-row" key={`${st.round}-${idx}`}>
-                  <strong>R{st.round} (${st.price_usd.toLocaleString()}): {st.action.toUpperCase()}</strong>
-                  <span>{usd(st.equity_usd)} ({pct(st.pnl_bps)})</span>
-                  <span>{st.note}</span>
+    {open && <div className="arena-body">
+      {error && <div className="status-message" role="status">{error}</div>}
+      {data && <>
+        <div className="card-actions" style={{ marginBottom: '14px' }}>
+          {data.scenarios.map(s => (
+            <ScrambleButton
+              key={s.id}
+              className={data.scenario.id === s.id ? 'solid-action' : ''}
+              label={busy === s.id ? `Running ${s.title.split(' (')[0]}…` : s.title}
+              disabled={Boolean(busy)}
+              onClick={() => void runScenario(s.id)}
+            />
+          ))}
+        </div>
+        <p style={{ margin: '0 0 12px', color: 'var(--muted)' }}><strong>{data.scenario.title}:</strong> {data.scenario.subtitle}</p>
+        <div className="stat-row">
+          <div><span>ETH Price Tape</span><strong>{data.scenario.prices_usd.map(p => `$${p.toLocaleString()}`).join(' → ')}</strong></div>
+          <div><span>Survived</span><strong>{data.summary.survived} / {data.summary.launched}</strong></div>
+          <div><span>Auto-killed</span><strong>{data.summary.killed_by_vault} 🪦</strong></div>
+          <div><span>Best / Worst</span><strong>{pct(data.summary.best_pnl_bps)} / {pct(data.summary.worst_pnl_bps)}</strong></div>
+        </div>
+        <div className="bot-grid">
+          {data.contenders.map(c => (
+            <article className="app-panel bot-card" key={c.bot_id}>
+              <div className="bot-top">
+                <div>
+                  <h3>{c.label}</h3>
+                  <p>{c.ens_name}</p>
                 </div>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
+                <span className={c.status === 'alive' ? 'alive-badge' : 'dead-badge'}>
+                  {c.status === 'alive' ? 'Survived ✓' : '🪦 Hit loss limit'}
+                </span>
+              </div>
+              <div className="stat-row">
+                <div><span>Final Equity</span><strong>{usd(c.final_equity_usd)}</strong></div>
+                <div><span>Return</span><strong className={c.pnl_bps > 0 ? 'pnl-pos' : c.pnl_bps < 0 ? 'pnl-neg' : ''}>{pct(c.pnl_bps)}</strong></div>
+                <div><span>Trades / Blocked</span><strong>{c.trades} / {c.blocked}</strong></div>
+              </div>
+              <div className="timeline">
+                <h4>Round-by-round replay</h4>
+                {c.steps.map((st, idx) => (
+                  <div className="timeline-row" key={`${st.round}-${idx}`}>
+                    <strong>R{st.round} (${st.price_usd.toLocaleString()}): {st.action.toUpperCase()}</strong>
+                    <span>{usd(st.equity_usd)} ({pct(st.pnl_bps)})</span>
+                    <span>{st.note}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </>}
     </div>}
-  </section>;
+  </div>;
 }

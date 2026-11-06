@@ -2,11 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getCreator, request, saveCreator, type Bot, type Brain, type BrainReport, type Event, type Grave, type Info, type Manager, type Report } from './api';
 
 export function useDashboard() {
-  const [creator, setCreator] = useState('');
+  const [creator, setCreator] = useState(getCreator);
   const [info, setInfo] = useState<Info | null>(null);
   const [brains, setBrains] = useState<Brain[]>([]);
   const [bots, setBots] = useState<Bot[]>([]);
   const [latestEvents, setLatestEvents] = useState<Record<number, Event>>({});
+  const [botEvents, setBotEvents] = useState<Record<number, Event[]>>({});
   const [manager, setManager] = useState<Manager | null>(null);
   const [managerError, setManagerError] = useState('');
   const [graves, setGraves] = useState<Grave[]>([]);
@@ -39,8 +40,15 @@ export function useDashboard() {
       setBots(live);
       const events = await Promise.allSettled(live.map(bot => request<Event[]>(`/api/bots/${bot.bot_id}/events`)));
       const latest: Record<number, Event> = {};
-      events.forEach((result, index) => { if (result.status === 'fulfilled' && result.value[0]) latest[live[index].bot_id] = result.value[0]; });
+      const byBot: Record<number, Event[]> = {};
+      events.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          byBot[live[index].bot_id] = result.value.slice(0, 5);
+          if (result.value[0]) latest[live[index].bot_id] = result.value[0];
+        }
+      });
       setLatestEvents(latest);
+      setBotEvents(byBot);
       setError('');
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Could not load live bots.'); }
@@ -81,5 +89,5 @@ export function useDashboard() {
     return () => { window.clearInterval(liveTimer); window.clearInterval(managerTimer); window.clearInterval(recordTimer); document.removeEventListener('visibilitychange', onVisible); };
   }, [refreshLive, refreshRecord, refreshManager]);
 
-  return { creator, setCreator, info, brains, bots, latestEvents, manager, managerError, setManager, graves, report, comparison, error, recordError, refreshLive, refreshRecord, refreshManager };
+  return { creator, setCreator, info, brains, bots, latestEvents, botEvents, manager, managerError, setManager, graves, report, comparison, error, recordError, refreshLive, refreshRecord, refreshManager };
 }

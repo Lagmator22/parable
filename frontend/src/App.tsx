@@ -6,12 +6,20 @@ import { Arena } from './dashboard/Arena';
 import { Launch } from './dashboard/Launch';
 import { Live } from './dashboard/Live';
 import { ProofBar } from './dashboard/ProofBar';
-import { Record } from './dashboard/Record';
+import { CompareBrains, Record } from './dashboard/Record';
 import { Swarm } from './dashboard/Swarm';
 import { useDashboard } from './dashboard/useDashboard';
 
 type Theme = 'dark' | 'light';
-const nav = [{ label: 'Home', href: '#top' }, { label: 'Launch', href: '#launch' }, { label: 'Live bots', href: '#live' }, { label: 'AI Swarm', href: '#swarm' }, { label: 'Market Arena', href: '#arena' }, { label: 'Graveyard', href: '#graveyard' }, { label: 'Compare brains', href: '#compare' }, { label: 'Test the vault', href: '#proof' }, { label: 'How it works', href: '#how' }];
+const nav = [
+  { label: 'Home', href: '#top' },
+  { label: 'Launch', href: '#launch' },
+  { label: 'Live bots', href: '#live' },
+  { label: 'Graveyard', href: '#graveyard' },
+  { label: 'Try to cheat', href: '#proof' },
+  { label: 'Extras', href: '#extras' },
+  { label: 'How it works', href: '#how' },
+];
 
 function savedTheme(): Theme {
   try { return localStorage.getItem('parable-theme') === 'light' ? 'light' : 'dark'; }
@@ -83,36 +91,44 @@ export default function App() {
       <ProofBar info={dashboard.info} creator={dashboard.creator}/>
       <section className="hero">
         <div className="hero-copy">
-          <h1>Every bot.<br/>Every trade.<br/><span>Every failure.</span></h1>
-          <p>Creators can show you their winners. Parable shows you the whole record, including the bots that died.</p>
-        </div>
-        <div className="hero-visual" aria-label="Explore a bot's public history" onPointerMove={event => {
-          if (event.pointerType === 'touch') return;
-          const bounds = event.currentTarget.getBoundingClientRect();
-          event.currentTarget.style.setProperty('--pointer-x', `${event.clientX - bounds.left}px`);
-          event.currentTarget.style.setProperty('--pointer-y', `${event.clientY - bounds.top}px`);
-        }}>
-          <h2 className="visual-title">A bot's public history</h2>
-          <a className="visual-line" href="#launch" onClick={event => scrollToSection(event, '#launch')} aria-label="Born, go to launch a bot"><span>01</span><div><strong>Born</strong><p>Approved by a real person</p></div></a>
-          <a className="visual-line" href="#live" onClick={event => scrollToSection(event, '#live')} aria-label="Traded, go to live bots"><span>02</span><div><strong>Traded</strong><p>Checked by the vault</p></div></a>
-          <a className="visual-line" href="#graveyard" onClick={event => scrollToSection(event, '#graveyard')} aria-label="Died, go to the graveyard"><span>03</span><div><strong>Died</strong><p>Still visible in the graveyard</p></div></a>
+          <span className="live-tag">LIVE · Sepolia + World ID + ENSv2 + Arkiv</span>
+          <h1>Every trading strategy has a graveyard.<br/><span>Parable is where bots can’t lie about theirs.</span></h1>
+          <div className="hero-actions">
+            <ScrambleLink label="Launch a bot" href="#launch" className="main-action" onClick={event => scrollToSection(event, '#launch')} arrow />
+            <ScrambleLink label="See live bots" href="#live" onClick={event => scrollToSection(event, '#live')} arrow />
+            <ScrambleLink label="Graveyard" href="#graveyard" onClick={event => scrollToSection(event, '#graveyard')} arrow />
+          </div>
         </div>
       </section>
       <Launch info={dashboard.info} brains={dashboard.brains} onBorn={creator => { dashboard.setCreator(creator); void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
-      <Live bots={dashboard.bots} creator={dashboard.creator} latestEvents={dashboard.latestEvents} onRefresh={() => { void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
-      <Swarm manager={dashboard.manager} error={dashboard.managerError} onUpdate={dashboard.setManager}/>
-      <Arena/>
-      <Record graves={dashboard.graves} report={dashboard.report} comparison={dashboard.comparison} bots={dashboard.bots} creator={dashboard.creator} info={dashboard.info} recordError={dashboard.recordError}/>
-      <section className="content-section" id="how">
-        <div className="section-heading"><h2>Bots don’t keep<br/>their own score.</h2><p>A bot can request a trade. The vault decides whether it is allowed, holds the practice money, and records what happened.</p></div>
-        <div className="feature-grid">
-          <article><span>01</span><h3>One real creator</h3><p>World approval connects each bot to a verified human before launch.</p></article>
-          <article><span>02</span><h3>Clear permissions</h3><p>An ENS name gives the bot an identity the vault can check and revoke.</p></article>
-          <article><span>03</span><h3>No hidden losses</h3><p>Arkiv keeps births, trades and deaths searchable, even after a bot stops.</p></article>
+      <Live bots={dashboard.bots} creator={dashboard.creator} botEvents={dashboard.botEvents} info={dashboard.info} onRefresh={() => { void dashboard.refreshLive(); void dashboard.refreshRecord(); }}/>
+      <Record graves={dashboard.graves} report={dashboard.report} bots={dashboard.bots} creator={dashboard.creator} info={dashboard.info} recordError={dashboard.recordError}/>
+      <section className="app-section" id="extras">
+        <div className="app-heading">
+          <div>
+            <h2>Extras</h2>
+            <p>AI Swarm oversight, head-to-head Market Arena simulation, and public brain comparison.</p>
+          </div>
+          <span className="section-number">05</span>
+        </div>
+        <div className="extras-stack">
+          <Swarm manager={dashboard.manager} error={dashboard.managerError} onUpdate={dashboard.setManager}/>
+          <Arena/>
+          <CompareBrains comparison={dashboard.comparison} recordError={dashboard.recordError}/>
         </div>
       </section>
-      <section className="trust-section" id="trust"><h2>Don’t take a bot’s<br/><em>word for it.</em></h2><p>Parable’s vault is the source of truth. It counts every bot and every trade. The public record carries transaction links, so anyone can check the history independently.</p><div className="trust-note"><strong>Built on Sepolia with practice funds.</strong><span>The record shows honesty about results, not proof that a strategy will make money.</span></div></section>
+      <section className="content-section" id="how">
+        <div className="section-heading">
+          <h2>How it works</h2>
+          <p>A bot can request a trade. The ParableVault on Sepolia checks its ENSv2 badge and risk rules, and Arkiv records every birth, trade, and death permanently.</p>
+        </div>
+        <div className="feature-grid">
+          <article><span>01 · World ID</span><h3>One real creator</h3><p>World approval connects each bot to a verified human before launch.</p></article>
+          <article><span>02 · ENSv2 + Vault</span><h3>Clear permissions</h3><p>A soulbound ENSv2 subname gives the bot an identity the Sepolia vault can check and revoke.</p></article>
+          <article><span>03 · Arkiv</span><h3>No hidden losses</h3><p>Arkiv keeps births, trades, and deaths searchable forever, even after a bot dies.</p></article>
+        </div>
+      </section>
     </main>
-    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard.</span><ScrambleLink label="Back to top" href="#top" onClick={event => scrollToSection(event, '#top')}/></footer>
+    <footer inert={menuOpen}><strong>Parable<span>.</span></strong><span>Every strategy has a graveyard · Built on Sepolia, World ID, ENSv2 &amp; Arkiv</span><ScrambleLink label="Back to top" href="#top" onClick={event => scrollToSection(event, '#top')}/></footer>
   </div>;
 }

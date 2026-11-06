@@ -170,3 +170,51 @@
 @media(max-width:700px){.proof-bar{top:70px}}
 .app-section,.content-section,.trust-section{scroll-margin-top:188px}
 @media(max-width:700px){.app-section,.content-section,.trust-section{scroll-margin-top:222px}}
+
+/* Demo-first compact layout (<= 6 screens at 1440x900, responsive down to 375px). */
+.hero{min-height:auto;max-height:60vh;padding:34px clamp(18px,4vw,56px);display:block;border-bottom:1px solid var(--line)}
+.hero h1{font-size:clamp(34px,4.2vw,62px);line-height:1.08;letter-spacing:-.055em;white-space:normal;max-width:1080px;margin:10px 0 22px}
+.hero-actions{gap:16px}
+.main-action{padding:14px 22px;border:2px solid var(--button)}
+.app-section,.content-section{padding:40px clamp(18px,4vw,56px)}
+.app-heading{margin-bottom:20px}
+.app-heading h2,.section-heading h2{font-size:clamp(32px,3.8vw,52px);margin:6px 0 10px}
+.app-heading p,.section-heading>p{font-size:clamp(16px,1.5vw,20px)}
+.app-panel{padding:clamp(18px,2.2vw,28px)}
+.stat-row{margin:16px 0;padding:14px 0;gap:16px}
+.feature-grid{margin-top:24px;gap:14px}
+.feature-grid article{min-height:0;padding:22px}
+.feature-grid h3{margin:16px 0 8px;font-size:24px}
+.live-tag,.sim-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.live-tag{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);border:1px solid var(--accent)}
+.sim-badge{background:#4a251d;color:#ffb4a2;border:2px solid #ff7b72;font-size:13px;padding:6px 12px}
+:root[data-theme=light] .sim-badge{background:#ffe5e0;color:#8c1d13;border-color:#c93b2b}
+.pulse-dot{width:9px;height:9px;border-radius:50%;background:#4ade80;margin-right:8px; display:inline-block;animation:pulse-dot 1.6s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.45);opacity:.45}}
+.pnl-pos{color:#4ade80!important}
+.pnl-neg{color:#ff7b72!important}
+:root[data-theme=light] .pnl-pos{color:#15803d!important}
+:root[data-theme=light] .pnl-neg{color:#b91c1c!important}
+.grave-cause{font-size:clamp(22px,2.4vw,30px);font-weight:800;letter-spacing:-.03em;color:#ff7b72;margin:10px 0 6px}
+:root[data-theme=light] .grave-cause{color:#b91c1c}
+.timeline{margin-top:16px;padding-top:14px}
+.timeline h4{font-size:16px;margin:0 0 8px;color:var(--muted)}
+.timeline-row{grid-template-columns:86px 96px 1fr;gap:10px;padding:9px 6px;font-size:14px;border-radius:4px}
+.event-flash{animation:event-flash 1.2s ease-out}
+@keyframes event-flash{0%{background:color-mix(in srgb,var(--accent) 28%,transparent)}100%{background:transparent}}
+.event-blocked{background:color-mix(in srgb,#ff6b6b 14%,transparent)}
+.blocked-tag{color:#ff6b6b!important;font-weight:800}
+.proof-inline-link{color:var(--accent);font-weight:700;text-decoration:underline;margin-left:6px}
+.launch-steps{list-style:none;margin:18px 0 0;padding:14px 18px;border:2px solid var(--outline);border-radius:6px;background:var(--bg);display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 18px}
+.launch-steps li{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--muted)}
+.launch-steps li.step-done{color:var(--ink);font-weight:700}
+.launch-steps li.step-active{color:var(--accent);font-weight:700}
+.launch-steps .step-mark{color:var(--accent);font-weight:800}
+.launch-steps a{color:var(--accent);text-decoration:underline;font-size:14px;margin-left:auto}
+.extras-stack{display:grid;gap:18px}
+.extra-block h3{font-size:clamp(24px,2.5vw,32px);margin:4px 0 6px;letter-spacing:-.04em}
+.extra-block p{color:var(--muted);margin:0;font-size:16px}
+.extra-head{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+.arena-body{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+@media(max-width:520px){.hero{max-height:none;padding:24px 16px}.app-section,.content-section{padding:28px 16px}.timeline-row{grid-template-columns:1fr auto}.timeline-row span:last-child{grid-column:1/-1}.launch-steps{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.pulse-dot,.event-flash{animation:none!important}}
