@@ -21,6 +21,11 @@ from parable.models import BotRules, TradeDecision
 
 log = logging.getLogger("parable.bot")
 
+
+def redact(err: Exception) -> str:
+    """Error type + message with every URL removed (RPC URLs can contain API keys)."""
+    return f"{type(err).__name__}: " + re.sub(r"https?://\S+", "<url>", str(err))[:300]
+
 LLM_TIMEOUT_S = 30  # Gemma can take ~17s. The bot loop interval must stay longer than this.
 DEAD_REASONS = {"NotAlive", "Expired", "BadgeInvalid", "NotRegistered"}
 PRESETS = {
@@ -252,7 +257,7 @@ def run_bot(bot_id: int, bot_key: str, rules: BotRules, stop_event: Event,
         except Exception as err:  # a failed trade must not crash the loop
             reason = vault.decode_revert(err)
             if reason == "UnknownError":
-                log.warning("bot %s trade failed: %r", bot_id, err)  # server log only, so the cause is findable
+                log.warning("bot %s trade failed: %s", bot_id, redact(err))  # server log only, URLs removed
             report("rejected", {"reason": reason})
             if reason in DEAD_REASONS:
                 report("stopped", {"reason": reason})

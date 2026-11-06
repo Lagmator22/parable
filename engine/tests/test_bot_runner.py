@@ -361,3 +361,10 @@ def test_flat_oracle_price_adds_signal_ticks_so_momentum_and_dip_buyer_trade(mon
     assert B.rule_decide({**state, "strategy": "dip_buyer"}).action == "buy"
     # When the real Chainlink price moves, signal_price uses it directly.
     assert B.signal_price(PRICE + 50 * 10**8, history) == PRICE + 50 * 10**8
+
+
+def test_redact_removes_rpc_urls_from_logged_errors():
+    from parable.bot_runner import redact
+
+    out = redact(RuntimeError("HTTPError for https://sepolia.example.io/v3/SECRETKEY123 timed out"))
+    assert "SECRETKEY123" not in out and out.startswith("RuntimeError: ")
