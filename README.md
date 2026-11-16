@@ -10,9 +10,9 @@ Parable lets you launch AI trading bots with practice funds and inspect their fu
 
 The vault registers each bot before it can trade, checks its ENSv2 badge and limits on every trade, and calculates its return. Arkiv makes the history queryable, including losing and stopped bots. The dashboard compares the public record with the vault's bot count so readers can spot missing records.
 
-**[Try the live demo](https://parable-demo.centralindia.cloudapp.azure.com)**. Built solo at ETHGlobal Mumbai 2026 on Ethereum Sepolia and Arkiv Rabdi.
+**[Try the live demo](https://parable-aq1q.onrender.com)**. Built solo at ETHGlobal Mumbai 2026 on Ethereum Sepolia and Arkiv Rabdi.
 
-[![Parable dashboard showing launch controls and the vault's bot counts](docs/images/dashboard.png)](https://parable-demo.centralindia.cloudapp.azure.com)
+[![Parable dashboard showing launch controls and the vault's bot counts](docs/images/dashboard.png)](https://parable-aq1q.onrender.com)
 
 ## Why it matters
 
@@ -37,10 +37,10 @@ Anyone can sell an AI trading bot with a great track record: launch 20 bots, del
 
 ## Try it
 
-1. **[Launch](https://parable-demo.centralindia.cloudapp.azure.com/#launch).** Choose a strategy, model, starting balance, trade cap, loss limit and lifetime. Approve with World ID, or use the labeled demo option to try the flow without a phone.
-2. **[Running](https://parable-demo.centralindia.cloudapp.azure.com/#live).** Follow a bot's decisions and open the Sepolia transaction links. Use **Telemetry** in the top bar to inspect prices and bot returns.
-3. **[Register](https://parable-demo.centralindia.cloudapp.azure.com/#register).** Browse stopped bots 10 at a time. Each row shows trades, runtime and why the bot stopped, with links to Arkiv and Sepolia when available.
-4. **[Try to cheat](https://parable-demo.centralindia.cloudapp.azure.com/#cheat).** Dry-run an unregistered trade, an over-limit trade or a second-wallet attempt against the vault. The dashboard shows the contract response and a command you can run yourself.
+1. **[Launch](https://parable-aq1q.onrender.com/#launch).** Choose a strategy, model, starting balance, trade cap, loss limit and lifetime. Approve with World ID, or use the labeled demo option to try the flow without a phone.
+2. **[Running](https://parable-aq1q.onrender.com/#live).** Follow a bot's decisions and open the Sepolia transaction links. Use **Telemetry** in the top bar to inspect prices and bot returns.
+3. **[Register](https://parable-aq1q.onrender.com/#register).** Browse stopped bots 10 at a time. Each row shows trades, runtime and why the bot stopped, with links to Arkiv and Sepolia when available.
+4. **[Try to cheat](https://parable-aq1q.onrender.com/#cheat).** Dry-run an unregistered trade, an over-limit trade or a second-wallet attempt against the vault. The dashboard shows the contract response and a command you can run yourself.
 
 <details>
 <summary>See the launch form, Graveyard and Telemetry</summary>
@@ -66,7 +66,7 @@ You can also launch a group of bots supervised by a model in **Swarm**, or use t
 
 ## Verified demo results
 
-On 7 November 2026 (04:30 IST), the live API reported **26 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **68 trades**, **17 expiries** and **9 creator stops**. The vault refused every cheat attempt from the dashboard: an unregistered trade, an over-limit trade and a second wallet for the same person. [Live report](https://parable-demo.centralindia.cloudapp.azure.com/api/report) and [Graveyard API](https://parable-demo.centralindia.cloudapp.azure.com/api/graveyard/all)
+On 7 November 2026 (04:30 IST), the live API reported **26 registered bots**, all stopped, and confirmed the register matched the vault count. The public Graveyard reported **68 trades**, **17 expiries** and **9 creator stops**. The vault refused every cheat attempt from the dashboard: an unregistered trade, an over-limit trade and a second wallet for the same person. [Live report](https://parable-aq1q.onrender.com/api/report) and [Graveyard API](https://parable-aq1q.onrender.com/api/graveyard/all)
 
 Most bots ran for only a few minutes. The vault marks positions at the Chainlink feed price, which can stay flat during a short run. Returns are displayed to one decimal place, so a return such as −0.01% appears as 0.0%. The stop reason records how the bot ended, independently of its return.
 

@@ -9,6 +9,6 @@ The Python engine writes to Rabdi through the official Arkiv SDK in the [Node br
 | Read-only events and graves | The writer creates records whose recorded fields cannot be patched. The separate bot entity remains mutable so its status can change from alive to dead. |
 | Entity expiry and extension | A live bot entry has a lease plus one hour of grace. The engine retains stopped bot entries and graves for about 180 days. Events are kept for 30 days. Permissionless extension lets other readers keep entities available longer. |
 
-Open the [Graveyard](https://parable-demo.centralindia.cloudapp.azure.com/#register) and select an Arkiv link to inspect an entity. The page shows 10 rows at a time and compares the number of registered bots in the public record with the vault count. The engine retries failed writes and can reconstruct missing bot and death records from the vault. The earliest reconstructed record appears as bot #1.
+Open the [Graveyard](https://parable-aq1q.onrender.com/#register) and select an Arkiv link to inspect an entity. The page shows 10 rows at a time and compares the number of registered bots in the public record with the vault count. The engine retries failed writes and can reconstruct missing bot and death records from the vault. The earliest reconstructed record appears as bot #1.
 
 See the [schema](schema.md) for fields and the [main README](../README.md#query-the-public-record) for a runnable query.

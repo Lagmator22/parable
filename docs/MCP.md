@@ -7,17 +7,17 @@ Codex and Claude Code use their own assistant models. The bot's model is selecte
 Clone this repo and install `uv`. From the repo root, start the server over standard input and output:
 
 ```bash
-PARABLE_URL=https://parable-demo.centralindia.cloudapp.azure.com \
+PARABLE_URL=https://parable-aq1q.onrender.com \
   uv --directory engine run python -m parable.mcp_server
 ```
 
 From the repo root, register Parable with Codex or Claude Code:
 
 ```bash
-codex mcp add parable --env PARABLE_URL=https://parable-demo.centralindia.cloudapp.azure.com \
+codex mcp add parable --env PARABLE_URL=https://parable-aq1q.onrender.com \
   -- uv --directory "$PWD/engine" run python -m parable.mcp_server
 
-claude mcp add parable -e PARABLE_URL=https://parable-demo.centralindia.cloudapp.azure.com \
+claude mcp add parable -e PARABLE_URL=https://parable-aq1q.onrender.com \
   -- uv --directory "$PWD/engine" run python -m parable.mcp_server
 ```
 
