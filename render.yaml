@@ -1,0 +1,55 @@
+services:
+  - type: web
+    name: parable
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/brains
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: SEPOLIA_RPC_URL
+        sync: false
+      - key: OPERATOR_PRIVATE_KEY
+        sync: false
+      - key: ARKIV_PRIVATE_KEY
+        sync: false
+      - key: ARKIV_ACCESS_KEY
+        sync: false
+      - key: PARABLE_CREATOR_SECRET
+        sync: false
+      - key: ARKIV_BRIDGE_TOKEN
+        generateValue: true
+      - key: VAULT_ADDRESS
+        value: "0x5432bE5713f358225d648eAb2EC9f699B25Ef317"
+      - key: CHAINLINK_ETH_USD
+        value: "0x694AA1769357215DE4FAC081bf1f309aDC325306"
+      - key: ENS_PARENT_NAME
+        value: "parable.eth"
+      - key: ENS_BADGE_ORACLE
+        value: "0x087077ceBb69d8617b41735aAe24232697Af4EcA"
+      - key: ENS_RESOLVER
+        value: "0xaba5B8A13Ac0c62AaF4d6FF2527BF8690DceAF80"
+      - key: ENS_SUBREGISTRY
+        value: "0xf749a1584e70A2285E608DF192A485EB87186B4b"
+      - key: ARKIV_RPC_URL
+        value: "https://rpc.rabdi.db-chain.testnet.arkiv.network"
+      - key: WORLD_CLIENT_ID
+        sync: false
+      - key: WORLD_CLIENT_SECRET
+        sync: false
+      - key: WORLD_MOCK
+        value: "0"
+      - key: WORLD_ALLOW_DEMO
+        value: "1"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODELS
+        value: "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
+      - key: GEMMA_MODELS
+        value: ""
+      - key: AUTOLOOPS_API_KEY
+        sync: false
+      - key: JEV_MODELS
+        value: "gemma-4-31b-it,deepseek-v4.1-flash"
+      - key: CLAUDE_MODELS
+        value: ""
